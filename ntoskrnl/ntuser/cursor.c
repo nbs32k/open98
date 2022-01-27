@@ -101,9 +101,8 @@ NtSetCursorPos(
 
 	KiClearCursor( pMousePositionOld );
 
-	KiDrawCursor( ucMousePointerInside, position, TRUE, 0xffffff );
-	KiDrawCursor( ucMousePointer, position, FALSE, 0x000000 );
-
+	KiDrawCursor( ucMousePointerInside, position, TRUE, 0xFFFFFFFF );
+	KiDrawCursor( ucMousePointer, position, FALSE, 0x00000000 );
 
 	pMousePositionOld = KiMousePosition;
 }

@@ -1,7 +1,10 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\ntoskrnl",
+    "\\ntoskrnl\\hal",
+    "\\ntoskrnl\\hal\\acpi"
   ],
-  "SelectedNode": "\\ntldr",
+  "SelectedNode": "\\ntoskrnl\\hal\\acpi\\shutdown.c",
   "PreviewInSolutionExplorer": false
 }

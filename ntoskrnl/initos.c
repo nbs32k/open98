@@ -117,6 +117,78 @@ VOID Plasma( )
 		}
 	}
 }
+unsigned long createRGB( int r, int g, int b )
+{
+	return ( ( r & 0xff ) << 16 ) + ( ( g & 0xff ) << 8 ) + ( b & 0xff );
+}
+
+VOID
+KiDrawTypicalWindow( 
+	PCSTR pcText,
+	INT iStartX,
+	INT iEndX,
+	INT iStartY,
+	INT iEndY
+)
+{
+	KiDrawFilled( iStartX, iEndX, iStartY, iEndY, 0x000000 );
+	KiDrawFilled( iStartX, iEndX - 1, iStartY, iEndY - 1, 0xDFDFDF );
+	
+	KiDrawFilled( iStartX + 1, iEndX - 1, iStartY + 1, iEndY - 1, 0x808080 );
+	KiDrawFilled( iStartX + 1, iEndX - 2, iStartY + 1, iEndY - 2, 0xFFFFFF );
+
+	KiDrawFilled( iStartX + 2, iEndX - 2, iStartY + 2, iEndY - 2, 0xC0C0C0 );
+
+	//TitleBar - gradient
+	INT R = 0, G = 4, B = 130;
+	INT col = ( INT )createRGB( R, G, B );
+	for ( int i = iStartX + 3; i < iEndX - 3; ++i )
+	{
+		
+		if ( col < 0x1084d0 )
+		{
+			if ( R < 16 )R++;
+			if ( G < 132 )G++;
+			if ( B < 208 )B++;
+			col = ( INT )createRGB( R, G, B );
+		}
+		for ( int j = iStartY + 3; j < iStartY + 21; ++j )
+		{
+			
+			KiDrawPixel( i, j,  col);
+		}
+	}
+
+	KiDisplayString( pcText, iStartX + 6, iStartY + 3, 0xFFFFFFFF );
+	
+}
+
+VOID Memes( 
+	PCSTR lpMessage,
+	PCSTR lpTitle
+)
+{
+	INT iX = 120;
+	INT iY = 140;
+	INT iXEnd = 300;
+	INT iYEnd = 220;
+	KiDrawTypicalWindow( lpTitle, iX, iXEnd, iY, iYEnd );
+
+
+	INT iCharWidth = 8;
+	INT iCharHeight = 16;
+
+
+	INT iMiddleX = ( iX / 2 ) + ( iXEnd / 2 ) - //cut the screen in half, minus
+		( RtlStringLength( lpMessage ) * ( iCharWidth / 2 ) );//letter lenght, multiplied with
+														//letter font width devided by 2 (in half)
+
+	INT iMiddleY = ( iY / 2 ) + ( iYEnd / 2 ) -
+		( RtlStringLength( lpMessage ) / ( iCharHeight / 2 ) );
+
+	KiDisplayString( lpMessage, iMiddleX, iMiddleY, 0x00000000 );
+}
+
 
 #include "ke/ki.h"
 #include "mm/mm.h"
@@ -186,7 +258,7 @@ KiSystemStartup(
 
 	NtSetCursorPos( 30, 0 );
 
-	
+	Memes( "Message Text", "Message Box" );
 
 	
 
