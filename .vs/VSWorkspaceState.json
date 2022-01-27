@@ -1,16 +1,7 @@
 {
   "ExpandedNodes": [
-    "",
-    "\\kernel",
-    "\\kernel\\drv",
-    "\\kernel\\hal",
-    "\\kernel\\hal\\acpi",
-    "\\kernel\\hal\\io",
-    "\\kernel\\ke",
-    "\\kernel\\lib",
-    "\\kernel\\mm",
-    "\\kernel\\ntuser"
+    ""
   ],
-  "SelectedNode": "\\kernel\\drv\\vbe.c",
+  "SelectedNode": "\\ntldr",
   "PreviewInSolutionExplorer": false
 }

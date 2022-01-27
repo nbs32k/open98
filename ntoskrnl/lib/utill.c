@@ -1,0 +1,190 @@
+#include "utill.h"
+
+
+int strncmp( const char *s1, const char *s2, INT n )
+{
+	for ( INT i = 0; i < n; i++ )
+	{
+		char c1 = s1[ i ], c2 = s2[ i ];
+		if ( c1 != c2 )
+			return c1 - c2;
+		if ( !c1 )
+			return 0;
+	}
+
+	return 0;
+}
+
+int memcmp( const void *s1, const void *s2, INT n )
+{
+	const UCHAR *p1 = ( const UCHAR * )s1;
+	const UCHAR *p2 = ( const UCHAR * )s2;
+
+	for ( INT i = 0; i < n; i++ )
+	{
+		if ( p1[ i ] != p2[ i ] )
+			return p1[ i ] < p2[ i ] ? -1 : 1;
+	}
+
+	return 0;
+}
+
+int pow( int base, int exp )
+{
+	int result = 1;
+	for ( exp; exp > 0; exp-- )
+	{
+		result = result * base;
+	}
+	return result;
+}
+
+
+PCHAR strcpy( PCHAR destination, const char* source )
+{
+	if ( destination == NULL )
+	{
+		return NULL;
+	}
+	PCHAR ptr = destination;
+	while ( *source != '\0' )
+	{
+		*destination = *source;
+		destination++;
+		source++;
+	}
+	*destination = '\0';
+	return ptr;
+}
+
+PCHAR strcat( PCHAR destination, const char* source )
+{
+	PCHAR ptr = destination + strlen( destination );
+	while ( *source != '\0' )
+	{
+		*ptr++ = *source++;
+	}
+	*ptr = '\0';
+	return destination;
+}
+
+int strcmp( const char* a, const char* b )
+{
+	while ( *a && *a == *b ) { ++a; ++b; }
+	return ( int )( unsigned char )( *a ) - ( int )( unsigned char )( *b );
+}
+
+PCHAR strstr( const char *str, const char *substring )
+{
+	const char *a = str, *b = substring;
+	for ( ;;)
+	{
+		if ( !*b ) return ( char * )str;
+		if ( !*a ) return NULL;
+		if ( *a++ != *b++ ) { a = ++str; b = substring; }
+	}
+}
+
+void memcpy( void* dest, void* src, INT n )
+{
+	int i;
+	PCHAR src_char = ( char * )src;
+	PCHAR dest_char = ( char * )dest;
+	for ( i = 0; i < n; i++ )
+	{
+		dest_char[ i ] = src_char[ i ];
+	}
+}
+
+void memset( void* str, char ch, INT n )
+{
+	int i;
+	PCHAR s = ( char * )str;
+	for ( i = 0; i < n; i++ )
+	{
+		s[ i ] = ch;
+	}
+}
+
+void reverse( char s[ ] )
+{
+	int c, i, j;
+	for ( i = 0, j = strlen( s ) - 1; i < j; i++, j-- )
+	{
+		c = s[ i ];
+		s[ i ] = s[ j ];
+		s[ j ] = c;
+	}
+}
+
+PCHAR int_to_string( int num )
+{
+	BOOLEAN isMinus = FALSE;
+	static char out[ 10 ];
+	int g = 0;
+	if ( num != 0 )
+	{
+		char temp[ 10 ];
+		int i = 0;
+		if ( num < 0 )
+		{
+			isMinus = TRUE;
+			num = -num;
+		}
+		if ( num > 0 ); else { temp[ i++ ] = '8'; num = -( num / 10 ); }
+		while ( num > 0 )
+		{
+			temp[ i++ ] = num % 10 + '0';
+			num /= 10;
+		}
+		if ( isMinus )
+		{
+			out[ g ] = '-';
+			g++;
+		}
+		while ( --i >= 0 )
+		{
+			out[ g ] = temp[ i ];
+			g++;
+		}
+		return out;
+	}
+	else
+	{
+		return "0";
+	}
+}
+
+int string_to_int( PCHAR str )
+{
+	int res = 0;
+	for ( int i = 0; str[ i ] != '\0'; ++i )
+	{
+		res = res * 10 + str[ i ] - '0';
+	}
+	return res;
+}
+void memmove( void* dest, void* src, INT n )
+{
+	char *csrc = ( char * )src;
+	char *cdest = ( char * )dest;
+	char temp[ n ];
+	for ( int i = 0; i < n; i++ )
+		temp[ i ] = csrc[ i ];
+
+	for ( int i = 0; i < n; i++ )
+		cdest[ i ] = temp[ i ];
+}
+long oct_to_dec( int oct )
+{
+	int dec = 0, temp = 0;
+
+	while ( oct != 0 )
+	{
+		dec = dec + ( oct % 10 ) * pow( 8, temp );
+		temp++;
+		oct = oct / 10;
+	}
+
+	return dec;
+}
