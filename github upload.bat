@@ -2,5 +2,5 @@
 set /P id=Enter commit message: 
 git add * ./
 git commit -a -m "%id%"
-git push -u origin master
+git push -f origin master
 pause
