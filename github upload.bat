@@ -1,6 +1,6 @@
 @echo off
-git init
-git remote add origin https://github.com/n00bes/open98.git
-git branch -M master
+set /P id=Enter commit message: 
+git add ./
+git commit -a -m "%id%"
 git push -u origin master
 pause
