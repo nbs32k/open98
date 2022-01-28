@@ -4,8 +4,9 @@
     "\\ntoskrnl",
     "\\ntoskrnl\\hal",
     "\\ntoskrnl\\hal\\acpi",
-    "\\ntoskrnl\\hal\\idt"
+    "\\ntoskrnl\\hal\\idt",
+    "\\ntoskrnl\\ke"
   ],
-  "SelectedNode": "\\ntoskrnl\\hal\\idt\\idt.c",
+  "SelectedNode": "\\ntoskrnl\\ke\\ki.h",
   "PreviewInSolutionExplorer": false
 }
