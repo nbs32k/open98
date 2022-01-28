@@ -14,7 +14,7 @@ KiUniToAscii(
 
 STATIC VOID
 KiUpdateKeyboard(
-	struct interrupt_registers *reg
+	struct InterruptRegisters *reg
 )
 {
 	UCHAR ucScanCode;

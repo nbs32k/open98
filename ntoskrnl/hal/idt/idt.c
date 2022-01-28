@@ -1,8 +1,13 @@
 #include "idt.h"
 #include <stdint.h>
-int_handler_t interrupt_handlers[ 256 ];
+KiInterruptHandler interrupt_handlers[ 256 ]; //there are 256 interrupt vectors!
 
-VOID HalSetIDTDescriptor( UCHAR vector, PVOID isr, UCHAR type_attr )
+VOID
+HalSetIDTDescriptor(
+	UCHAR vector,
+	PVOID isr,
+	UCHAR type_attr
+)
 {
 	struct idt_desc_t *descriptor = ( struct idt_desc_t * )&idt[ vector ];
 
@@ -15,17 +20,27 @@ VOID HalSetIDTDescriptor( UCHAR vector, PVOID isr, UCHAR type_attr )
 	descriptor->zero = 0;
 }
 
-STATIC VOID not_implemented( struct interrupt_registers * );
-VOID HalInstallIRS();
+STATIC VOID
+KiNotImplementedIrq(
+	struct InterruptRegisters *
+);
 
-VOID HalInitIDT()
+VOID
+HalInstallIRS(
+
+);
+
+VOID
+HalInitIDT(
+
+)
 {
 	idtr.base = ( uintptr_t )&idt[ 0 ];
 	idtr.limit = ( USHORT )sizeof( struct idt_desc_t ) * 256 - 1;
 
 	for ( INT i = 32; i < 48; i++ )
 	{
-		HalRegisterInterrupt( i, not_implemented );
+		HalRegisterInterrupt( i, KiNotImplementedIrq );
 	}
 
 	HalInstallIRS();
@@ -33,32 +48,61 @@ VOID HalInitIDT()
 	__asm__ volatile( "lidt %0"
 					  :
 	: "memory"( idtr ) );
-	__asm__ volatile( "sti" );
+	KiEnableInt( );
 
 	void( *term_write )( const char *string, UINT length ) = term_write_ptr;
 	term_write( "Initialized IDT\n", 17 );
 }
 
-VOID HalRegisterInterrupt( UCHAR n, int_handler_t handler )
+VOID
+HalRegisterInterrupt(
+	UCHAR n,
+	KiInterruptHandler handler
+)
 {
 	interrupt_handlers[ n ] = handler;
 }
+
 #include "../../ke/ki.h"
-VOID isr_handler( struct interrupt_registers *regs )
+
+VOID
+HalISRHandler(
+	struct InterruptRegisters *regs
+)
 {
 	//RtlRaiseException( regs );
+	KeBugCheck( regs );
+
 	PCHAR shet[ 512 ];
 	sprintf( shet, "Raise Exception: %s", exception_messages[regs->int_no] );
 	DbgPrintFmt( shet ); //autism 
-	asm( "cli" );
-	asm( "hlt" );
+	
 }
 
-VOID irq_handler( struct interrupt_registers *regs )
+VOID
+KiDisableInt( 
+
+)
+{
+	__asm__ volatile( "cli" );
+}
+
+VOID
+KiEnableInt( 
+
+)
+{
+	__asm__ volatile( "sti" );
+}
+
+VOID
+HalIRQHandler(
+	struct InterruptRegisters *regs 
+)
 {
 	if ( interrupt_handlers[ regs->int_no ] != 0 )
 	{
-		int_handler_t handler = interrupt_handlers[ regs->int_no ];
+		KiInterruptHandler handler = interrupt_handlers[ regs->int_no ];
 		handler( regs );
 	}
 
@@ -88,14 +132,23 @@ VOID KeLowerIrql(
 )
 {
 	interrupt_handlers[ NewIrql.IRQ ] = NewIrql.Address;
-	if( NewIrql.Address == IRQ_ADDR_NONE ) interrupt_handlers[ NewIrql.IRQ ] = not_implemented;
+	if( NewIrql.Address == IRQ_ADDR_NONE ) interrupt_handlers[ NewIrql.IRQ ] = KiNotImplementedIrq;
 }
 
-STATIC VOID not_implemented( struct interrupt_registers *testing )
+STATIC VOID
+KiNotImplementedIrq(
+	struct InterruptRegisters *testing
+)
 {
+
+	//nothing
+
 }
 
-VOID HalInstallIRS()
+VOID
+HalInstallIRS(
+
+)
 {
 	HalSetIDTDescriptor( 0, ( PVOID )isr0, 0x8E );
 	HalSetIDTDescriptor( 1, ( PVOID )isr1, 0x8E );

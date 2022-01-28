@@ -49,7 +49,7 @@ KiGetRTCData(
 
 STATIC VOID
 KiUpdateClock( 
-	//struct interrupt_registers *reg
+	//struct InterruptRegisters *reg
 )
 {
 	KiGlobalTime.Seconds = KiGetRTCData( RTC_SECONDS );

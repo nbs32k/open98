@@ -186,7 +186,7 @@ halt:
 
 	KiDisplayString( Text, iMiddleX, iMiddleY, 0xFFFFFFFF );
 
-	asm( "cli" );
+	KiDisableInt( );
 
 	for ( ;;)asm( "hlt" );
 		

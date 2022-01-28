@@ -261,6 +261,7 @@ KiSystemStartup(
 	Memes( "Message Text", "Message Box" );
 
 	
+	asm( "int $0x2" );
 
 	
 

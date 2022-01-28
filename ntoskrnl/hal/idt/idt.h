@@ -147,24 +147,32 @@ struct idtr_t
 	ULONG64 base;
 } __attribute__( ( packed ) );
 
-struct interrupt_registers 
+struct InterruptRegisters 
 {
-	ULONG64 r15, r14, r13, r12, r11, r10, r9, r8, rbp, rdi, rsi, rdx, rcx, rbx, rax, int_no, error_code, rip, cs, rflags, rsp, ss;
+	ULONG64 r15, r14, r13, r12,
+	r11, r10, r9, r8, rbp, rdi,
+	rsi, rdx, rcx, rbx, rax,
+	int_no, error_code, rip,
+	cs, rflags, rsp, ss;
 }__attribute__( ( packed ) );
 
 static struct idt_entry_t idt[ 256 ] __attribute__( ( aligned( 0x10 ) ) );
 
 static struct idtr_t idtr;
 
-void HalInitIDT();
+VOID
+HalInitIDT(
 
-typedef void( *int_handler_t )( struct interrupt_registers *registers );
+);
 
-VOID HalRegisterInterrupt( UCHAR n, int_handler_t handler );
+typedef void( *KiInterruptHandler )( struct InterruptRegisters *registers );
 
-void isr_handler( struct interrupt_registers *regs );
+VOID
+HalRegisterInterrupt(
+	UCHAR n,
+	KiInterruptHandler handler
+);
 
-void irq_handler( struct interrupt_registers *regs );
 
 VOID KeRaiseIrql(
   KIRQL  NewIrql,
@@ -173,4 +181,14 @@ VOID KeRaiseIrql(
 
 VOID KeLowerIrql(
   KIRQL NewIrql
+);
+
+VOID
+KiEnableInt(
+
+);
+
+VOID
+KiDisableInt(
+
 );

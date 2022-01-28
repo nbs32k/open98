@@ -221,7 +221,7 @@ KiProcessMouse(
 
 VOID
 KiUpdateMouse(
-	struct interrupt_registers *reg
+	struct InterruptRegisters *reg
 )
 {
 

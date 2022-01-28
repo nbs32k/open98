@@ -3,8 +3,9 @@
     "",
     "\\ntoskrnl",
     "\\ntoskrnl\\hal",
-    "\\ntoskrnl\\hal\\acpi"
+    "\\ntoskrnl\\hal\\acpi",
+    "\\ntoskrnl\\hal\\idt"
   ],
-  "SelectedNode": "\\ntoskrnl\\hal\\acpi\\shutdown.c",
+  "SelectedNode": "\\ntoskrnl\\hal\\idt\\idt.c",
   "PreviewInSolutionExplorer": false
 }

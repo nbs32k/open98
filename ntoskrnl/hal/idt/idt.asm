@@ -34,14 +34,14 @@
     pop rax
 %endmacro
 
-[extern isr_handler]
-[extern irq_handler]
+[extern HalISRHandler]
+[extern HalIRQHandler]
 
 isr_common_stub:
     __pusha
     mov rdi, rsp
 
-    call isr_handler
+    call HalISRHandler
 
     __popa
     add rsp, 16
@@ -51,7 +51,7 @@ irq_common_stub:
     __pusha
     mov rdi, rsp
 
-    call irq_handler
+    call HalIRQHandler
 
     __popa
     add rsp, 16

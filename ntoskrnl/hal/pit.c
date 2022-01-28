@@ -24,7 +24,7 @@ KiGetTickCount(
 
 STATIC VOID
 KiUpdateTick(
-	struct interrupt_registers *reg
+	struct InterruptRegisters *reg
 )
 {
 	ulTick++;

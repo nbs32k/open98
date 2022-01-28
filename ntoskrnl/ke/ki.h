@@ -20,3 +20,8 @@ VOID
 DbgPrintFmt(
 	CONST CHAR *fmt, ...
 );
+
+VOID
+KeBugCheck(
+	struct InterruptRegisters* Reg
+);
