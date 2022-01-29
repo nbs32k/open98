@@ -5,7 +5,7 @@ HalInitModule(
 
 )
 {
-	HalInitSSE();
+	
 	void( *term_write )( const char *string, UINT length ) = term_write_ptr;
 	term_write( "Initialized SSE\n", 17 );
 

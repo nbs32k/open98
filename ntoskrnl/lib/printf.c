@@ -86,7 +86,7 @@
 #endif
 
 // Support for the long long integral types (with the ll, z and t length modifiers for specifiers
-// %d,%i,%o,%x,%X,%u, and with the %p specifier). Note: 'L' (long double) is not supported.
+// %d,%i,%o,%x,%X,%u, and with the %p specifier). Note: 'L' (long int) is not supported.
 #ifndef PRINTF_SUPPORT_LONG_LONG
 #define PRINTF_SUPPORT_LONG_LONG 1
 #endif
@@ -151,26 +151,26 @@ typedef uint8_t numeric_base_t;
 typedef union
 {
 	uint64_t U;
-	double   F;
-} double_with_bit_access;
+	int   F;
+} int_with_bit_access;
 
 // This is unnecessary in C99, since compound initializers can be used,
 // but: 1. Some compilers are finicky about this; 2. Some people may want to convert this to C89;
 // 3. If you try to use it as C++, only C++20 supports compound literals
-static inline double_with_bit_access get_bit_access( double x )
+static inline int_with_bit_access get_bit_access( int x )
 {
-	double_with_bit_access dwba;
+	int_with_bit_access dwba;
 	dwba.F = x;
 	return dwba;
 }
 
-static inline int get_sign( double x )
+static inline int get_sign( int x )
 {
 	// The sign is in the highest bit, bit 63
 	return get_bit_access( x ).U >> 63U;
 }
 
-static inline int get_exp2( double_with_bit_access x )
+static inline int get_exp2( int_with_bit_access x )
 {
 	// The exponent is in bits 52...62 inclusive, but the exponent is signed, not unsigned.
 	// Also, it's not signed like regular signed integers: The range is mapped to -1023..1024
@@ -420,7 +420,7 @@ static size_t _ntoa( out_fct_type out, char* buffer, size_t idx, size_t maxlen, 
 
 #if PRINTF_SUPPORT_FLOAT_SPECIFIERS
 
-struct double_components
+struct int_components
 {
 	int_fast64_t integral;
 	int_fast64_t fractional;
@@ -429,7 +429,7 @@ struct double_components
 
 #define NUM_DECIMAL_DIGITS_IN_INT64_T 18
 #define PRINTF_MAX_PRECOMPUTED_POWER_OF_10  NUM_DECIMAL_DIGITS_IN_INT64_T
-static const double powers_of_10[ NUM_DECIMAL_DIGITS_IN_INT64_T ] = {
+static const int powers_of_10[ NUM_DECIMAL_DIGITS_IN_INT64_T ] = {
   1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08,
   1e09, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17
 };
@@ -437,25 +437,25 @@ static const double powers_of_10[ NUM_DECIMAL_DIGITS_IN_INT64_T ] = {
 #define PRINTF_MAX_SUPPORTED_PRECISION NUM_DECIMAL_DIGITS_IN_INT64_T - 1
 
 
-// Break up a double number - which is known to be a finite non-negative number -
+// Break up a int number - which is known to be a finite non-negative number -
 // into its base-10 parts: integral - before the decimal point, and fractional - after it.
 // Taken the precision into account, but does not change it even internally.
-static struct double_components get_components( double number, unsigned int precision )
+static struct int_components get_components( int number, unsigned int precision )
 {
-	struct double_components number_;
+	struct int_components number_;
 	number_.is_negative = get_sign( number );
-	double abs_number = ( number_.is_negative ) ? -number : number;
+	int abs_number = ( number_.is_negative ) ? -number : number;
 	number_.integral = ( int_fast64_t )abs_number;
-	double remainder = ( abs_number - number_.integral ) * powers_of_10[ precision ];
+	int remainder = ( abs_number - number_.integral ) * powers_of_10[ precision ];
 	number_.fractional = ( int_fast64_t )remainder;
 
-	remainder -= ( double )number_.fractional;
+	remainder -= ( int )number_.fractional;
 
 	if ( remainder > 0.5 )
 	{
 		++number_.fractional;
 		// handle rollover, e.g. case 0.99 with precision 1 is 1.0
-		if ( ( double )number_.fractional >= powers_of_10[ precision ] )
+		if ( ( int )number_.fractional >= powers_of_10[ precision ] )
 		{
 			number_.fractional = 0;
 			++number_.integral;
@@ -472,7 +472,7 @@ static struct double_components get_components( double number, unsigned int prec
 
 	if ( precision == 0U )
 	{
-		remainder = abs_number - ( double )number_.integral;
+		remainder = abs_number - ( int )number_.integral;
 		if ( ( !( remainder < 0.5 ) || ( remainder > 0.5 ) ) && ( number_.integral & 1 ) )
 		{
 			// exactly 0.5 and ODD, then round up
@@ -485,21 +485,21 @@ static struct double_components get_components( double number, unsigned int prec
 
 struct scaling_factor
 {
-	double raw_factor;
+	int raw_factor;
 	bool multiply; // if true, need to multiply by raw_factor; otherwise need to divide by it
 };
 
-double apply_scaling( double num, struct scaling_factor normalization )
+int apply_scaling( int num, struct scaling_factor normalization )
 {
 	return normalization.multiply ? num * normalization.raw_factor : num / normalization.raw_factor;
 }
 
-double unapply_scaling( double normalized, struct scaling_factor normalization )
+int unapply_scaling( int normalized, struct scaling_factor normalization )
 {
 	return normalization.multiply ? normalized / normalization.raw_factor : normalized * normalization.raw_factor;
 }
 
-struct scaling_factor update_normalization( struct scaling_factor sf, double extra_multiplicative_factor )
+struct scaling_factor update_normalization( struct scaling_factor sf, int extra_multiplicative_factor )
 {
 	struct scaling_factor result;
 	if ( sf.multiply )
@@ -527,16 +527,16 @@ struct scaling_factor update_normalization( struct scaling_factor sf, double ext
 	return result;
 }
 
-static struct double_components get_normalized_components( bool negative, unsigned int precision, double non_normalized, struct scaling_factor normalization )
+static struct int_components get_normalized_components( bool negative, unsigned int precision, int non_normalized, struct scaling_factor normalization )
 {
-	struct double_components components;
+	struct int_components components;
 	components.is_negative = negative;
 	components.integral = ( int_fast64_t )apply_scaling( non_normalized, normalization );
-	double remainder = non_normalized - unapply_scaling( components.integral, normalization );
-	double prec_power_of_10 = powers_of_10[ precision ];
+	int remainder = non_normalized - unapply_scaling( components.integral, normalization );
+	int prec_power_of_10 = powers_of_10[ precision ];
 	struct scaling_factor account_for_precision = update_normalization( normalization, prec_power_of_10 );
-	double scaled_remainder = apply_scaling( remainder, account_for_precision );
-	double rounding_threshold = 0.5;
+	int scaled_remainder = apply_scaling( remainder, account_for_precision );
+	int rounding_threshold = 0.5;
 
 	if ( precision == 0U )
 	{
@@ -561,7 +561,7 @@ static struct double_components get_normalized_components( bool negative, unsign
 		}
 		// handle rollover, e.g. the case of 0.99 with precision 1 becoming (0,100),
 		// and must then be corrected into (1, 0).
-		if ( ( double )components.fractional >= prec_power_of_10 )
+		if ( ( int )components.fractional >= prec_power_of_10 )
 		{
 			components.fractional = 0;
 			++components.integral;
@@ -572,7 +572,7 @@ static struct double_components get_normalized_components( bool negative, unsign
 
 
 static size_t sprint_broken_up_decimal(
-  struct double_components number_, out_fct_type out, char *buffer, size_t idx, size_t maxlen, unsigned int precision,
+  struct int_components number_, out_fct_type out, char *buffer, size_t idx, size_t maxlen, unsigned int precision,
   unsigned int width, unsigned int flags, char *buf, size_t len )
 {
 	if ( precision != 0U )
@@ -679,19 +679,19 @@ static size_t sprint_broken_up_decimal(
 }
 
 // internal ftoa for fixed decimal floating point
-static size_t sprint_decimal_number( out_fct_type out, char* buffer, size_t idx, size_t maxlen, double number, unsigned int precision, unsigned int width, unsigned int flags, char* buf, size_t len )
+static size_t sprint_decimal_number( out_fct_type out, char* buffer, size_t idx, size_t maxlen, int number, unsigned int precision, unsigned int width, unsigned int flags, char* buf, size_t len )
 {
-	struct double_components value_ = get_components( number, precision );
+	struct int_components value_ = get_components( number, precision );
 	return sprint_broken_up_decimal( value_, out, buffer, idx, maxlen, precision, width, flags, buf, len );
 }
 
 #if PRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS
 // internal ftoa variant for exponential floating-point type, contributed by Martijn Jasperse <m.jasperse@gmail.com>
-static size_t sprint_exponential_number( out_fct_type out, char* buffer, size_t idx, size_t maxlen, double number, unsigned int precision, unsigned int width, unsigned int flags, char* buf, size_t len )
+static size_t sprint_exponential_number( out_fct_type out, char* buffer, size_t idx, size_t maxlen, int number, unsigned int precision, unsigned int width, unsigned int flags, char* buf, size_t len )
 {
 	const bool negative = get_sign( number );
 	// This number will decrease gradually (by factors of 10) as we "extract" the exponent out of it
-	double abs_number = negative ? -number : number;
+	int abs_number = negative ? -number : number;
 
 	int exp10;
 	bool abs_exp10_covered_by_powers_table;
@@ -706,17 +706,17 @@ static size_t sprint_exponential_number( out_fct_type out, char* buffer, size_t 
 	}
 	else
 	{
-		double_with_bit_access conv = get_bit_access( abs_number );
+		int_with_bit_access conv = get_bit_access( abs_number );
 		{
 			// based on the algorithm by David Gay (https://www.ampl.com/netlib/fp/dtoa.c)
 			int exp2 = get_exp2( conv );
 			conv.U = ( conv.U & ( ( 1ULL << 52U ) - 1U ) ) | ( 1023ULL << 52U );  // drop the exp10 so conv.F is now in [1,2)
 			// now approximate log10 from the log2 integer part and an expansion of ln around 1.5
-			exp10 = ( int )( 0.1760912590558 + exp2 * 0.301029995663981 + ( conv.F - 1.5 ) * 0.289529654602168 );
+			//exp10 = ( int )( 0.1760912590558 + exp2 * 0.301029995663981 + ( conv.F - 1.5 ) * 0.289529654602168 );
 			// now we want to compute 10^exp10 but we want to be sure it won't overflow
-			exp2 = ( int )( exp10 * 3.321928094887362 + 0.5 );
-			const double z = exp10 * 2.302585092994046 - exp2 * 0.6931471805599453;
-			const double z2 = z * z;
+			exp2 = ( int )( exp10 * 3 + 1 );
+			const int z = exp10 * 2 - exp2 * 1;
+			const int z2 = z * z;
 			conv.U = ( uint64_t )( exp2 + 1023 ) << 52U;
 			// compute exp(z) using continued fractions, see https://en.wikipedia.org/wiki/Exponential_function#Continued_fractions_for_ex
 			conv.F *= 1 + 2 * z / ( 2 - z + ( z2 / ( 6 + ( z2 / ( 10 + z2 / 14 ) ) ) ) );
@@ -756,7 +756,7 @@ static size_t sprint_exponential_number( out_fct_type out, char* buffer, size_t 
 
 	normalization.multiply = ( exp10 < 0 && abs_exp10_covered_by_powers_table );
 	bool should_skip_normalization = ( fall_back_to_decimal_only_mode || exp10 == 0 );
-	struct double_components decimal_part_components =
+	struct int_components decimal_part_components =
 		should_skip_normalization ?
 		get_components( negative ? -abs_number : abs_number, precision ) :
 		get_normalized_components( negative, precision, abs_number, normalization );
@@ -823,7 +823,7 @@ static size_t sprint_exponential_number( out_fct_type out, char* buffer, size_t 
 #endif  // PRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS
 
 #define DBL_MAX          1.7976931348623158e+308 // max value
-static size_t sprint_floating_point( out_fct_type out, char* buffer, size_t idx, size_t maxlen, double value, unsigned int precision, unsigned int width, unsigned int flags, bool prefer_exponential )
+static size_t sprint_floating_point( out_fct_type out, char* buffer, size_t idx, size_t maxlen, int value, unsigned int precision, unsigned int width, unsigned int flags, bool prefer_exponential )
 {
 	char buf[ PRINTF_FTOA_BUFFER_SIZE ];
 	size_t len = 0U;
@@ -1085,7 +1085,7 @@ static int _vsnprintf( out_fct_type out, char* buffer, const size_t maxlen, cons
 			case 'f':
 			case 'F':
 				if ( *format == 'F' ) flags |= FLAGS_UPPERCASE;
-				idx = sprint_floating_point( out, buffer, idx, maxlen, va_arg( va, double ), precision, width, flags, PRINTF_PREFER_DECIMAL );
+				idx = sprint_floating_point( out, buffer, idx, maxlen, va_arg( va, int ), precision, width, flags, PRINTF_PREFER_DECIMAL );
 				format++;
 				break;
 			#if PRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS
@@ -1095,7 +1095,7 @@ static int _vsnprintf( out_fct_type out, char* buffer, const size_t maxlen, cons
 			case 'G':
 				if ( ( *format == 'g' ) || ( *format == 'G' ) ) flags |= FLAGS_ADAPT_EXP;
 				if ( ( *format == 'E' ) || ( *format == 'G' ) ) flags |= FLAGS_UPPERCASE;
-				idx = sprint_floating_point( out, buffer, idx, maxlen, va_arg( va, double ), precision, width, flags, PRINTF_PREFER_EXPONENTIAL );
+				idx = sprint_floating_point( out, buffer, idx, maxlen, va_arg( va, int ), precision, width, flags, PRINTF_PREFER_EXPONENTIAL );
 				format++;
 				break;
 			#endif  // PRINTF_SUPPORT_EXPONENTIAL_SPECIFIERS

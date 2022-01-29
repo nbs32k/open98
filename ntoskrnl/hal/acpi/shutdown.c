@@ -2,7 +2,7 @@
 #include "shutdown.h"
 #include "../../drv/drv.h"
 #include "../../lib/utill.h"
-#include "../../mm/mm.h"
+
 #include "../../ke/ki.h"
 
 struct facp
@@ -171,7 +171,7 @@ halt:
 	DbgPrintFmt( "(NtShutdownSystem) NtSetSystemPowerState failed, jumping to manual screen." );
 	KiDrawFilled( 0, KiVBEData.Width, 0, KiVBEData.Height, 0x00000000 );
 
-	PCHAR* Text = malloc( 42 );
+	PCHAR* Text;// = malloc( 42 );
 	Text = "It is now safe to shutdown your computer!";
 
 	INT iCharWidth = 8;

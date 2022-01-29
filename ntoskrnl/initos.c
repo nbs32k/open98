@@ -3,8 +3,11 @@
 #include <stivale2.h>
 #include "windef.h"
 
-static UCHAR stack[8192];
-
+static UCHAR stack[4096];
+VOID
+KiSystemStartup(
+	struct stivale2_struct *stivale2_struct
+);
 static struct stivale2_header_tag_terminal terminal_hdr_tag = {
 	.tag = {
 
@@ -33,7 +36,7 @@ static struct stivale2_header_tag_framebuffer framebuffer_hdr_tag = {
 __attribute__((section(".stivale2hdr"), used))
 static struct stivale2_header stivale_hdr = {
 
-    .entry_point = 0,
+    .entry_point = (ULONG64)KiSystemStartup,
 
     .stack = (uintptr_t)stack + sizeof(stack),
 
@@ -43,7 +46,8 @@ static struct stivale2_header stivale_hdr = {
 };
 
 
-PVOID KiGetStivale2Tag(
+PVOID
+KiGetStivale2Tag(
   struct stivale2_struct *stivale2_struct,
   ULONG64 id
 )
@@ -163,6 +167,37 @@ KiDrawTypicalWindow(
 	
 }
 
+VOID
+KiDrawTypicalButton(
+	INT iStartX,
+	INT iStartY
+)
+{
+	INT iEndX = iStartX + 100;
+	INT iEndY = iStartY + 30;
+
+	KiDrawFilled( iStartX, iEndX, iStartY, iEndY, 0x00000000 );
+	KiDrawFilled( iStartX + 1, iEndX - 2, iStartY + 1, iEndY - 2, 0xFFFFFFFF );
+
+
+	KiDrawFilled( iStartX + 2, iEndX - 2, iStartY + 2, iEndY - 2, 0x808080 );
+	KiDrawFilled( iStartX + 2, iEndX - 3, iStartY + 2, iEndY - 3, 0xC0C0C0 );
+
+
+	INT iCharWidth = 8;
+	INT iCharHeight = 16;
+
+
+	INT iMiddleX = ( iStartX / 2 ) + ( iEndX / 2 ) - //cut the screen in half, minus
+		( RtlStringLength( "OK" ) * ( iCharWidth / 2 ));//letter lenght, multiplied with
+														//letter font width devided by 2 (in half)
+
+	INT iMiddleY = ( iStartY / 2 ) + ( iEndY / 2 ) -
+		( RtlStringLength( "OK" ) / ( iCharHeight / 2 ) + 7);
+
+	KiDisplayString( "OK", iMiddleX, iMiddleY, 0x00000000 );
+}
+
 VOID Memes( 
 	PCSTR lpMessage,
 	PCSTR lpTitle
@@ -170,8 +205,8 @@ VOID Memes(
 {
 	INT iX = 120;
 	INT iY = 140;
-	INT iXEnd = 300;
-	INT iYEnd = 220;
+	INT iXEnd = 320;
+	INT iYEnd = 240;
 	KiDrawTypicalWindow( lpTitle, iX, iXEnd, iY, iYEnd );
 
 
@@ -179,18 +214,22 @@ VOID Memes(
 	INT iCharHeight = 16;
 
 
-	INT iMiddleX = ( iX / 2 ) + ( iXEnd / 2 ) - //cut the screen in half, minus
-		( RtlStringLength( lpMessage ) * ( iCharWidth / 2 ) );//letter lenght, multiplied with
-														//letter font width devided by 2 (in half)
+	INT iMiddleX = ( iX / 2 ) + ( iXEnd / 2 );
 
-	INT iMiddleY = ( iY / 2 ) + ( iYEnd / 2 ) -
-		( RtlStringLength( lpMessage ) / ( iCharHeight / 2 ) );
+	INT iMiddleY = ( iY / 2 ) + ( iYEnd / 2 );
 
-	KiDisplayString( lpMessage, iMiddleX, iMiddleY, 0x00000000 );
+
+	
+	KiDisplayString( lpMessage, iMiddleX -
+		 (RtlStringLength( lpMessage ) * ( iCharWidth / 2 )), iMiddleY -
+		 (RtlStringLength( lpMessage ) / ( iCharHeight / 2 )) - 10, 0x00000000 );
+
+	KiDrawTypicalButton( iMiddleX - 50 , iMiddleY + 10 );
 }
 
 
 #include "ke/ki.h"
+//#include "mm/mm.h"
 #include "mm/mm.h"
 #include "ntuser/ntuser.h"
 
@@ -204,7 +243,7 @@ KiSystemStartup(
     
 	
 	
-
+	//HalInitSSE( );
 
 
 	struct stivale2_struct_tag_terminal *term_str_tag;
@@ -214,15 +253,18 @@ KiSystemStartup(
 
 	struct stivale2_struct_tag_memmap *mmap = KiGetStivale2Tag( stivale2_struct, STIVALE2_STRUCT_TAG_MEMMAP_ID );
 
-
-	MmInit( mmap );
+	
+	
+	//MmInit( mmap );
 
 	HalInitModule( );
 
+	MiPhysicalInit( KiGetStivale2Tag( stivale2_struct, STIVALE2_STRUCT_TAG_MEMMAP_ID ) );
+	MiVirtualizeInit( );
 
 	HalInitVBE( stivale2_struct );
 
-	KiInitSinTable( );
+	//KiInitSinTable( );
 	
 	KiDrawFilled( 0, KiVBEData.Width, 0, KiVBEData.Height, 0x008080 );
 
@@ -256,12 +298,12 @@ KiSystemStartup(
 		0xffffffff
 	);
 
-	NtSetCursorPos( 30, 0 );
+	NtSetCursorPos( 0, 0 );
 
 	Memes( "Message Text", "Message Box" );
 
 	
-	asm( "int $0x2" );
+	//asm( "int $0x2" );
 
 	
 

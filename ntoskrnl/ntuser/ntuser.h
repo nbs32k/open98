@@ -2,8 +2,8 @@
 
 typedef struct _POINT
 {
-	FLOAT X;
-	FLOAT Y;
+	INT X;
+	INT Y;
 } POINT;
 
 POINT KiMousePosition;

@@ -5,8 +5,8 @@
 PCHAR strcpy( PCHAR destination, const char* source );
 PCHAR strcat( PCHAR destination, const char* source );
 int strcmp( const char* a, const char* b );
-void memcpy( void* dest, void* src, INT n );
-void memset( void* str, char ch, INT n );
+void *memcpy( void *dest, const void *src, INT n );
+void *memset( void *s, int c, INT n );
 void memmove( void* dest, void* src, INT n );
 int strncmp( const char *s1, const char *s2, INT n );
 int memcmp( const void *s1, const void *s2, INT n );
@@ -26,16 +26,16 @@ strlen(
 
 
 //math.c - thanks to sleep
-FLOAT sqrt( FLOAT x );
-FLOAT fast_isqrt( FLOAT x );
-FLOAT hypot( FLOAT x, FLOAT y );
-FLOAT fabs( FLOAT x );
+INT sqrt( INT x );
+INT fast_isqrt( INT x );
+INT hypot( INT x, INT y );
+INT fabs( INT x );
 
 VOID
 KiInitSinTable(
 
 );
 
-FLOAT sin( FLOAT x );
-FLOAT cos( FLOAT x );
-FLOAT tan( FLOAT x );
+INT sin( INT x );
+INT cos( INT x );
+INT tan( INT x );

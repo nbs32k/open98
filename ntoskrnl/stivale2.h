@@ -388,4 +388,11 @@ typedef struct boot_rsdp
 
 #undef _stivale2_split64
 
+
+#include "windef.h"
+PVOID
+KiGetStivale2Tag(
+  struct stivale2_struct *stivale2_struct,
+  ULONG64 id
+);
 #endif

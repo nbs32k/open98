@@ -85,26 +85,27 @@ PCHAR strstr( const char *str, const char *substring )
 	}
 }
 
-void memcpy( void* dest, void* src, INT n )
+void *memset( void *s, int c, INT n )
 {
-	int i;
-	PCHAR src_char = ( char * )src;
-	PCHAR dest_char = ( char * )dest;
-	for ( i = 0; i < n; i++ )
+	UCHAR *s_uint8 = ( UCHAR * )s;
+	for ( INT i = 0; i < n; i++ )
 	{
-		dest_char[ i ] = src_char[ i ];
+		s_uint8[ i ] = ( UCHAR )c;
 	}
+	return s;
 }
 
-void memset( void* str, char ch, INT n )
+void *memcpy( void *dest, const void *src, INT n )
 {
-	int i;
-	PCHAR s = ( char * )str;
-	for ( i = 0; i < n; i++ )
+	const UCHAR *src_uint8 = ( const UCHAR * )src;
+	UCHAR *dest_uint8 = ( UCHAR * )dest;
+	for ( INT i = 0; i < n; i++ )
 	{
-		s[ i ] = ch;
+		dest_uint8[ i ] = src_uint8[ i ];
 	}
+	return dest;
 }
+
 
 void reverse( char s[ ] )
 {

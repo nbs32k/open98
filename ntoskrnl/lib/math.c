@@ -1,32 +1,32 @@
 #include "utill.h"
+/*
 
-
-#define PI 3.141592653589793238462
+#define PI 3
 // fast isqrt method, skidded from quake3 algorithm
 
 // error of 0.2% - 2%, but who cares
-FLOAT fast_isqrt( FLOAT x )
+INT fast_isqrt( INT x )
 {
 	LONG i;
-	FLOAT x2, y;
-	const FLOAT threehalfs = 1.5F;
+	INT x2, y;
+	const INT threehalfs = 1.5F;
 
 	x2 = x * 0.5F;
 	y = x;
-	i = *( LONG* )&y;  // evil FLOATing poINT bit level hacking
+	i = *( LONG* )&y;  // evil INTing poINT bit level hacking
 	i = 0x5f3759df - ( i >> 1 ); // what the fuck? 
-	y = *( FLOAT* )&i;
+	y = *( INT* )&i;
 	y = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
 	// y = * (threehalfs - (x2*y*y)); can be removed
 	return y;
 }
 
-FLOAT sqrt( FLOAT x )
+INT sqrt( INT x )
 {
 	return fast_isqrt( x ) * x;
 }
 
-FLOAT hypot( FLOAT x, FLOAT y )
+INT hypot( INT x, INT y )
 {
 	// hypot = sqrt(x² + y²)
 	return sqrt( x*x + y * y );
@@ -34,12 +34,12 @@ FLOAT hypot( FLOAT x, FLOAT y )
 
 // sin, cos, tan
 
-FLOAT fabs( FLOAT x )
+INT fabs( INT x )
 {
 	return x < 0 ? -x : x;
 }
 
-static FLOAT sin_table[ 1024 ];
+static INT sin_table[ 1024 ];
 
 VOID 
 KiInitSinTable(
@@ -48,12 +48,12 @@ KiInitSinTable(
 {
 	for ( INT n = 0; 1024 > n; n++ )
 	{
-		FLOAT x = n / 1024. * PI;
+		INT x = n / 1024. * PI;
 		INT i = 2;
-		FLOAT cur = x;
-		FLOAT acc = 1;
-		FLOAT fact = 1;
-		FLOAT pow = x;
+		INT cur = x;
+		INT acc = 1;
+		INT fact = 1;
+		INT pow = x;
 		while ( fabs( acc ) > .000001 && i < 200 )
 		{
 			fact *= i * ( i + 1 );
@@ -66,7 +66,7 @@ KiInitSinTable(
 	}
 }
 
-FLOAT sin( FLOAT x )
+INT sin( INT x )
 {
 	INT index = ( INT )( x * ( 1. / ( PI / 1024 ) ) );
 	return
@@ -74,12 +74,12 @@ FLOAT sin( FLOAT x )
 		sin_table[ index & 1023 ];
 }
 
-FLOAT cos( FLOAT x )
+INT cos( INT x )
 {
 	return sin( PI / 2. + x );
 }
 
-FLOAT tan( FLOAT x )
+INT tan( INT x )
 {
 	return sin( x ) / cos( x );
-}
+}*/

@@ -1,21 +1,48 @@
-#include "../windef.h"
-#include "../stivale2.h"
+#pragma once
+#include <stddef.h>
+#include <stdint.h>
+#include <stivale2.h>
+#include "../lib/utill.h"
+#include "../ke/ki.h"
 
+//Physical Memory Manager
 
-#define MEM_BLOCK_LIST_SIZE 8192
-#define MEM_BLOCK_INCREASE_SIZE 4
-struct mem_block
-{
-	BOOLEAN is_used;
-	BOOLEAN is_end;
-	INT size;
-	INT addr;
-};
+#define PAGE_SIZE 4096
+#define CHECK_PAGE(page) (KiPhysBitmap[page / 8] & (1 << (page % 8)))
 
-void* malloc( INT size );
-VOID MmPopulateBlock( INT iStartAddr );
-UINT MmFindAvailableBlock( INT iStartIndex, INT iSize );
-PVOID malloc( INT iSize );
-VOID free( void* Mem );
+extern UCHAR *KiPhysBitmap;
 
-VOID MmInit( struct stivale2_struct_tag_memmap* MemMap );
+VOID MiPhysicalInit( struct stivale2_struct_tag_memmap *mem_tag );
+
+//Virtual Memory Manager
+
+#define HIGHER_HALF 0xffff800000000000
+#define KERNEL_OFFS 0xffffffff80000000
+
+extern ULONG64 *MiKernelPage;
+
+VOID
+MmLoadVirtualPage(
+	ULONG64 pml4
+);
+
+VOID
+MmMapMultiplePage(
+	ULONG64 *page_map,
+	ULONG64 base,
+	ULONG64 end,
+	ULONG64 offset,
+	ULONG64 flags
+);
+
+VOID
+MiVirtualizeInit(
+
+);
+
+//Heap
+
+VOID*
+kmalloc(
+	INT size
+);

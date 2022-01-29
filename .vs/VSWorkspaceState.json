@@ -2,11 +2,12 @@
   "ExpandedNodes": [
     "",
     "\\ntoskrnl",
+    "\\ntoskrnl\\drv",
     "\\ntoskrnl\\hal",
-    "\\ntoskrnl\\hal\\acpi",
     "\\ntoskrnl\\hal\\idt",
-    "\\ntoskrnl\\ke"
+    "\\ntoskrnl\\lib",
+    "\\ntoskrnl\\mm"
   ],
-  "SelectedNode": "\\ntoskrnl\\ke\\ki.h",
+  "SelectedNode": "\\ntoskrnl\\stivale2.h",
   "PreviewInSolutionExplorer": false
 }
