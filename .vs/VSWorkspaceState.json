@@ -1,0 +1,13 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\ntoskrnl",
+    "\\ntoskrnl\\drv",
+    "\\ntoskrnl\\drv\\filesystem",
+    "\\ntoskrnl\\drv\\filesystem\\fat32",
+    "\\ntoskrnl\\lib",
+    "\\ntoskrnl\\mm"
+  ],
+  "SelectedNode": "\\ntoskrnl\\drv\\filesystem\\partition.c",
+  "PreviewInSolutionExplorer": false
+}
