@@ -1,4 +1,4 @@
-#include "../windef.h"
+#include "../ntdef.h"
 
 
 //vbe.c
@@ -55,7 +55,8 @@ KiPrintToScreen(
 
 KVBE_STRUCTURE KiVBEData;
 
-
+UCHAR
+KiDisplayFont[ 4096 ];
 
 
 //keyboard.c

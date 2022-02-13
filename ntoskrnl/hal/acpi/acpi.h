@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "../../windef.h"
+#include "../../ntdef.h"
 
 #include <stivale2.h>
 

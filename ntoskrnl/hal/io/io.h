@@ -1,5 +1,5 @@
 #pragma once
-#include "../../windef.h"
+#include "../../ntdef.h"
 
 VOID outb( USHORT port, UCHAR data );
 

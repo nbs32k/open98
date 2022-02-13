@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../../drv/drv.h"
-#include "../../../windef.h"
+#include "../../../ntdef.h"
 #include "../../../ke/ki.h"
 #include "../acpi.h"
 

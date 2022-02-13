@@ -1,9 +1,6 @@
 #pragma once
-
-#include "../windef.h"
+#include <ntdef.h>
 #include "../hal/idt/idt.h"
-
-#include "../lib/utill.h"
 #include "../mm/mm.h"
 
 typedef struct TASK_STRUCT
@@ -62,6 +59,5 @@ PsScheduleThreads(
 
 VOID
 PspCreateThread(
-	ULONG64 ip,
-	UCHAR flags
+	LPTHREAD_START_ROUTINE lpThread
 );

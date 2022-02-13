@@ -1,23 +1,80 @@
 #include "fat32.h"
-#include <mm/mm.h>
-#include <drv/filesystem/storage.h>
+FAT32 *Partition[ 4 ];
 
-BPBTable* FatDiskBPB;
+STATIC VOID
+FatReadSectorBiosParameterBlock(
+	FAT32 *fs,
+	struct BiosParameterBlockStruct *BiosParameterBlock
+);
 
-UINT FatBeginSector;
-UINT FatClusterBeginSector;
+STATIC UINT
+FatAcquireSectorForCluster(
+	FAT32 *fs,
+	UINT cluster
+);
 
-UCHAR* BootSector;
 
-UINT* FAT;
-INT iClusterSize;
-UINT uiClusterAllocHint;
-UINT uiFirstFatSector;
+STATIC VOID
+FatGetSector(
+	FAT32 *fs,
+	UCHAR *buff,
+	UINT sector,
+	UINT count
+)
+{
+	KiATAReadDiskEx( sector, count, buff );
+}
 
-#define EOC 0x0FFFFFF8 //End of Chain
+STATIC VOID
+FatPutSector(
+	FAT32 *fs,
+	UCHAR *buff,
+	UINT sector,
+	UINT count
+)
+{
+	UINT i;
+	for ( i = 0; i < count; i++ )
+	{
+		KiATAWriteDisk( sector + i, 1, buff + ( i * 512 ) );
+	}
+}
 
-UCHAR
-readi32(
+STATIC VOID
+FatFlushFAT(
+	FAT32 *fs
+)
+{
+	// TODO: This is not endian-safe. Must marshal the integers into a byte buffer.
+	FatPutSector( fs, ( UCHAR * )fs->FAT, fs->FatSector, fs->BiosParameterBlock.SectorsPerFat32 );
+}
+
+STATIC VOID
+UtilTrimSpaces(
+	CHAR *c,
+	int max
+)
+{
+	int i = 0;
+	while ( *c != ' ' && i++ < max )
+	{
+		c++;
+	}
+	if ( *c == ' ' ) *c = 0;
+}
+
+STATIC USHORT
+UtilReadInteger16(
+	UCHAR *buff,
+	INT offset
+)
+{
+	UCHAR *ubuff = buff + offset;
+	return ubuff[ 1 ] << 8 | ubuff[ 0 ];
+}
+
+STATIC UINT
+UtilReadInteger32(
 	UCHAR *buff,
 	INT offset
 )
@@ -30,162 +87,110 @@ readi32(
 		( ubuff[ 0 ] & 0x000000FF );
 }
 
+INT iLastDriveCount = 0;
 
-USHORT
-readi16(
+STATIC VOID
+FatReadSectorBiosParameterBlock(
+	FAT32 *fs,
+	struct BiosParameterBlockStruct *BiosParameterBlock
+)
+{
+	UCHAR* BootSector = ( UCHAR* )malloc( 512 );
+	FatGetSector( fs, BootSector, FatAcquirePartitionSector( NULL ), 1 );
+
+	BiosParameterBlock->BytesPerSector = UtilReadInteger16( BootSector, 11 );;
+	BiosParameterBlock->SectorsPerCluster = BootSector[ 13 ];
+	BiosParameterBlock->ReservedSectors = UtilReadInteger16( BootSector, 14 );
+	BiosParameterBlock->FatCount = BootSector[ 16 ];
+	BiosParameterBlock->DirectoryEntries = UtilReadInteger16( BootSector, 17 );
+	BiosParameterBlock->TotalSectors = UtilReadInteger16( BootSector, 19 );
+	BiosParameterBlock->MediaDescriptorType = BootSector[ 21 ];
+	BiosParameterBlock->SectorsPerFat = UtilReadInteger16( BootSector, 22 );
+	BiosParameterBlock->SectorsPerTrack = UtilReadInteger16( BootSector, 24 );
+	BiosParameterBlock->HeadsOrSizesOnMedia = UtilReadInteger16( BootSector, 26 );
+	BiosParameterBlock->HiddenSectors = UtilReadInteger32( BootSector, 28 );
+	BiosParameterBlock->LargeSectorsOnMedia = UtilReadInteger32( BootSector, 32 );
+	// EBR
+	BiosParameterBlock->SectorsPerFat32 = UtilReadInteger32( BootSector, 36 );
+	BiosParameterBlock->flags = UtilReadInteger16( BootSector, 40 );
+	BiosParameterBlock->FatVersion = UtilReadInteger16( BootSector, 42 );
+	BiosParameterBlock->ClusterRootDirectory = UtilReadInteger32( BootSector, 44 );
+	BiosParameterBlock->FSInfoSectorNumber = UtilReadInteger16( BootSector, 48 );
+	BiosParameterBlock->BackupBootSectorNumber = UtilReadInteger16( BootSector, 50 );
+	// Skip 12 bytes
+	BiosParameterBlock->DriveNumber = BootSector[ 64 ];
+	BiosParameterBlock->WindowsFlags = BootSector[ 65 ];
+	BiosParameterBlock->Signature = BootSector[ 66 ];
+	BiosParameterBlock->VolumeSerial = UtilReadInteger32( BootSector, 67 );
+
+	//Null-Terminate Strings
+	RtlCopyMemory( &BiosParameterBlock->VolumeLabel, BootSector + 71, 11 ); BiosParameterBlock->VolumeLabel[ 11 ] = 0;
+	RtlCopyMemory( &BiosParameterBlock->SystemID, BootSector + 82, 8 ); BiosParameterBlock->SystemID[ 8 ] = 0;
+
+	free( BootSector );
+}
+
+STATIC UINT
+FatAcquireSectorForCluster(
+	FAT32 *fs,
+	UINT cluster
+)
+{
+	return fs->ClusterSector + ( ( cluster - 2 ) * fs->BiosParameterBlock.SectorsPerCluster );
+}
+
+// CLUSTER NUMBERS START AT 2 (for some reason...)
+VOID
+FatGetCluster(
+	FAT32 *fs,
 	UCHAR *buff,
-	INT offset
+	UINT cluster_number
 )
-{
-	UCHAR *ubuff = buff + offset;
-	return ubuff[ 1 ] << 8 | ubuff[ 0 ];
-}
-
-VOID
-trim_spaces(
-	char *c,
-	int max
-)
-{
-	int i = 0;
-	while ( *c != ' ' && i++ < max )
-	{
-		c++;
-	}
-	if ( *c == ' ' ) *c = 0;
-}
-
-VOID
-FatInitialize(
-
-)
-{
-	DbgPrintFmt( "Initializing Fat Partition" );
-	
-
-	
-
-
-	//Alloc memory for data
-	BootSector = ( UCHAR* )malloc( 512 );
-	RtlZeroMemory( BootSector, 512 );
-	//Get partition's sector
-	UINT LBAPartition = FatAcquirePartitionSector( NULL );
-
-	DbgPrintFmt( "Found FAT Partition at Sector: %d", LBAPartition );
-
-	//Read partition BPB
-	KiATAReadDiskEx( LBAPartition, 1, BootSector );
-	
-	FatDiskBPB = ( BPBTable* )BootSector; //Set the data from Harddisk to Struct
-
-	FatBeginSector = LBAPartition + FatDiskBPB->ReservedSectorCount;
-	FatClusterBeginSector = FatBeginSector + ( ( UINT )FatDiskBPB->NumberOfFAT * ( UINT )FatDiskBPB->ExtendedBootRecord.SectorsPerFat );
-
-	iClusterSize = 512 * ( UINT )FatDiskBPB->SectorsPerCluster;
-	UINT bPerFat = 512 * ( UINT )FatDiskBPB->ExtendedBootRecord.SectorsPerFat;
-	FAT = malloc( bPerFat );
-
-
-	UINT iSector;
-	for ( iSector = 0; iSector < FatDiskBPB->ExtendedBootRecord.SectorsPerFat; iSector++ )
-	{
-		DbgPrintFmt( "iSector: %d\nFatDiskBPB->ExtendedBootRecord.SectorsPerFat: %d", iSector, FatDiskBPB->ExtendedBootRecord.SectorsPerFat );
-		UCHAR sector[ 512 ];
-		KiATAReadDiskEx( sector, FatBeginSector + iSector, 1 );
-		UINT integer_j;
-		for ( integer_j = 0; integer_j < 512 / 4; integer_j++ )
-		{
-			FAT[ iSector * ( 512 / 4 ) + integer_j ]
-				= readi32( sector, integer_j * 4 );
-		}
-	}
-
-
-	//null-terminate
-	RtlSetMemory( FatDiskBPB->OEMIdentifier + 7, '\0', 1 );
-	RtlSetMemory( FatDiskBPB->ExtendedBootRecord.VolumeLabel + 10, '\0', 1 );
-	RtlSetMemory( FatDiskBPB->ExtendedBootRecord.SystemIdentifier + 7, '\0', 1 );
- 
-
-	DbgPrintFmt( "Partition Label: %s", FatDiskBPB->ExtendedBootRecord.VolumeLabel );
-	DbgPrintFmt( "System Identifier: %s", FatDiskBPB->ExtendedBootRecord.SystemIdentifier );
-	DbgPrintFmt( "Serial Number: %d", (UINT)FatDiskBPB->ExtendedBootRecord.VolumeIDSerial );
-
-
-	uiFirstFatSector = FatDiskBPB->ReservedSectorCount;
-
-	if ( RtlCompareMemory( FatDiskBPB->ExtendedBootRecord.SystemIdentifier, "FAT32", 5 ) != 0 )
-		DbgPrintFmt( "Current Partition is NOT a FAT32 one!" );
-
-}
-
-VOID
-FatFlushFAT( 
-
-)
-{
-	KiATAWriteDisk( FatBeginSector, FatDiskBPB->ExtendedBootRecord.SectorsPerFat, ( UCHAR * )FAT );
-}
-
-UINT
-FatGetClusterSector(
-	UINT uiCluster
-)
-{
-	return FatClusterBeginSector + ( ( uiCluster - 2 ) * FatDiskBPB->SectorsPerCluster );
-}
-
-VOID
-FatGetCluster( 
-	UCHAR *ucBuffer,
-	UINT uiClusterNum
-)
-{ // static
-	if ( uiClusterNum >= EOC )
+{ // STATIC
+	if ( cluster_number >= EOC )
 	{
 		DbgPrintFmt( "Can't get cluster. Hit End Of Chain." );
 	}
-	UINT uiSector = FatGetClusterSector( uiClusterNum );
-	UINT uiSectorCount = FatDiskBPB->SectorsPerCluster;
-
-	KiATAReadDiskEx( uiSector, uiSectorCount, ucBuffer );
+	UINT sector = FatAcquireSectorForCluster( fs, cluster_number );
+	UINT sector_count = fs->BiosParameterBlock.SectorsPerCluster;
+	FatGetSector( fs, buff, sector, sector_count );
 }
 
-VOID
+STATIC VOID
 FatPutCluster(
-	UCHAR *ucBuffer,
-	UINT uiClusterNum
+	FAT32 *fs,
+	UCHAR *buff,
+	UINT cluster_number
 )
 {
-	UINT uiSector = FatGetClusterSector( uiClusterNum );
-	UINT uiSectorCount = FatDiskBPB->SectorsPerCluster;
-
-	KiATAWriteDisk( uiSector, uiSectorCount, ucBuffer );
+	UINT sector = FatAcquireSectorForCluster( fs, cluster_number );
+	UINT sector_count = fs->BiosParameterBlock.SectorsPerCluster;
+	FatPutSector( fs, buff, sector, sector_count );
 }
 
 UINT
 FatGetNextClusterID(
-	UINT uiCluster
+	FAT32 *fs,
+	UINT cluster
 )
-{ // static
-	return FAT[ uiCluster ] & 0x0FFFFFFF;
+{ // STATIC
+	return fs->FAT[ cluster ] & 0x0FFFFFFF;
 }
 
-CHAR*
+STATIC CHAR* 
 FatParseLongName(
-	UCHAR* ucEntries,
-	UCHAR ucEntryCount
+	UCHAR *entries,
+	UCHAR entry_count
 )
 {
 	// each entry can hold 13 characters.
-	CHAR *name = malloc( ucEntryCount * 13 );
+	CHAR *name = malloc( entry_count * 13 );
 	int i, j;
-	for ( i = 0; i < ucEntryCount; i++ )
+	for ( i = 0; i < entry_count; i++ )
 	{
-		UCHAR *entry = ucEntries + ( i * 32 );
+		UCHAR *entry = entries + ( i * 32 );
 		UCHAR entry_no = ( UCHAR )entry[ 0 ] & 0x0F;
-		char *name_offset = name + ( ( entry_no - 1 ) * 13 );
+		CHAR *name_offset = name + ( ( entry_no - 1 ) * 13 );
 
 		for ( j = 1; j < 10; j += 2 )
 		{
@@ -227,48 +232,52 @@ FatParseLongName(
 	return name;
 }
 
-VOID
-FatClearCluster( 
-	UINT uiCluster
+STATIC VOID
+FatClearCluster(
+	FAT32 *fs,
+	UINT cluster
 )
 {
-	UCHAR ucBuffer[ iClusterSize ];
-	RtlZeroMemory( ucBuffer, iClusterSize );
-	FatPutCluster( ucBuffer, uiCluster );
+	UCHAR buffer[ fs->ClusterSize ];
+	RtlSetMemory( buffer, 0, fs->ClusterSize );
+	FatPutCluster( fs, buffer, cluster );
 }
 
-UINT
-FatAllocateCluster(
-
+STATIC UINT
+FatAllocCluster(
+	FAT32 *fs
 )
 {
-	UINT i, ints_per_fat = ( 512 * FatDiskBPB->SectorsPerCluster ) / 4;
-	for ( i = uiClusterAllocHint; i < ints_per_fat; i++ )
+	UINT i, ints_per_fat = ( 512 * fs->BiosParameterBlock.SectorsPerFat32 ) / 4;
+	for ( i = fs->ClusterAllocationHint; i < ints_per_fat; i++ )
 	{
-		if ( FAT[ i ] == 0 )
+		if ( fs->FAT[ i ] == 0 )
 		{
-			FAT[ i ] = 0x0FFFFFFF;
-			FatClearCluster( i );
-			uiClusterAllocHint = i + 1;
+			fs->FAT[ i ] = 0x0FFFFFFF;
+			FatClearCluster( fs, i );
+			fs->ClusterAllocationHint = i + 1;
 			return i;
 		}
 	}
-	for ( i = 0; i < uiClusterAllocHint; i++ )
+	for ( i = 0; i < fs->ClusterAllocationHint; i++ )
 	{
-		if ( FAT[ i ] == 0 )
+		if ( fs->FAT[ i ] == 0 )
 		{
-			FAT[ i ] = 0x0FFFFFFF;
-			FatClearCluster( i );
-			uiClusterAllocHint = i + 1;
+			fs->FAT[ i ] = 0x0FFFFFFF;
+			FatClearCluster( fs, i );
+			fs->ClusterAllocationHint = i + 1;
 			return i;
 		}
 	}
 	return 0;
 }
 
-UCHAR
-FatCheckSumFName(
-	CHAR* fname
+// Creates a checksum for an 8.3 filename
+// must be in Directory-entry format, i.e.
+// fat32.c -> "FAT32   C  "
+STATIC UCHAR
+FatCheckSumFNAME(
+	CHAR *fname
 )
 {
 	UINT i;
@@ -282,13 +291,13 @@ FatCheckSumFName(
 	return checksum;
 }
 
-VOID
+STATIC VOID
 FatWrite83FileName(
-	CHAR* fname,
-	UCHAR* buffer
+	CHAR *fname,
+	UCHAR *buffer
 )
 {
-	memset( buffer, ' ', 11 );
+	RtlSetMemory( buffer, ' ', 11 );
 	UINT namelen = strlen( fname );
 	// find the extension
 	int i;
@@ -348,23 +357,23 @@ FatWrite83FileName(
 	}
 }
 
-
-UCHAR*
+STATIC UCHAR*
 FatLocateEntries(
-	UCHAR* cluster_buffer,
-	struct directory *dir,
+	FAT32 *fs,
+	UCHAR *cluster_buffer,
+	struct Directory *dir,
 	UINT count,
 	UINT *found_cluster
 )
 {
-	UINT dirs_per_cluster = iClusterSize / 32;
+	UINT dirs_per_cluster = fs->ClusterSize / 32;
 
 	UINT i;
 	LONG64 index = -1;
 	UINT cluster = dir->cluster;
 	while ( 1 )
 	{
-		FatGetCluster( cluster_buffer, cluster );
+		FatGetCluster( fs, cluster_buffer, cluster );
 
 		UINT in_a_row = 0;
 		for ( i = 0; i < dirs_per_cluster; i++ )
@@ -388,19 +397,19 @@ FatLocateEntries(
 		}
 		if ( index >= 0 )
 		{
-			
+			// We found a spot to put our crap!
 			break;
 		}
 
-		UINT next_cluster = FAT[ cluster ];
+		UINT next_cluster = fs->FAT[ cluster ];
 		if ( next_cluster >= EOC )
 		{
-			next_cluster = FatAllocateCluster(  );
+			next_cluster = FatAllocCluster( fs );
 			if ( !next_cluster )
 			{
 				return 0;
 			}
-			FAT[ cluster ] = next_cluster;
+			fs->FAT[ cluster ] = next_cluster;
 		}
 		cluster = next_cluster;
 	}
@@ -408,8 +417,7 @@ FatLocateEntries(
 	return cluster_buffer + ( index * 32 );
 }
 
-
-VOID
+STATIC VOID
 FatWriteLongFileNameEntries(
 	UCHAR *start,
 	UINT num_entries,
@@ -417,16 +425,16 @@ FatWriteLongFileNameEntries(
 )
 {
 	// Create a short filename to use for the checksum.
-	char shortfname[ 12 ];
+	CHAR shortfname[ 12 ];
 	shortfname[ 11 ] = 0;
 	FatWrite83FileName( fname, ( UCHAR * )shortfname );
-	UCHAR checksum = FatCheckSumFName( shortfname );
+	UCHAR checksum = FatCheckSumFNAME( shortfname );
 
 	/* Write the long-filename entries */
 	// tracks the number of characters we've written into
 	// the long-filename entries.
 	UINT writtenchars = 0;
-	char *nameptr = fname;
+	CHAR *nameptr = fname;
 	UINT namelen = strlen( fname );
 	UCHAR *entry = NULL;
 	UINT i;
@@ -441,7 +449,7 @@ FatWriteLongFileNameEntries(
 		// Characters are 16 bytes in long-filename entries (j+=2)
 		// And they only go in certain areas in the 32-byte
 		// block. (why we have three loops)
-		uint32_t j;
+		UINT j;
 		for ( j = 1; j < 10; j += 2 )
 		{
 			if ( writtenchars < namelen )
@@ -488,27 +496,134 @@ FatWriteLongFileNameEntries(
 	entry[ 0 ] |= 0x40;
 }
 
-VOID
-FatDestroyFAT32(
 
+FAT32*
+FatResolveByPrefix(
+	CHAR* pcPath
+)
+{
+	for ( int i = 0; i < MAX_PARTITION; i++ )
+	{
+		if ( Partition[ i ] != NULL ) //check if partition exists
+			if ( memcmp( pcPath, Partition[ i ]->RootPath, 1 ) == 0 )// check for C:
+				return Partition[ i ];
+	}
+	return NULL;
+}
+
+FAT32*
+FatInitialize(
+	INT iPartitionNumber
+)
+{
+	INT PartitionSector = FatAcquirePartitionSector( iPartitionNumber );
+	if ( PartitionSector == -1 ) // not a partition :D
+	{
+		return NULL;
+	}
+
+	FAT32 *fs = malloc( sizeof( struct FAT32 ) );
+	/*if ( !KiATAIdentify( ) )
+	{
+		return NULL;
+	}*/
+	FatReadSectorBiosParameterBlock( fs, &fs->BiosParameterBlock );
+
+	UtilTrimSpaces( fs->BiosParameterBlock.SystemID, 8 );
+	if ( strcmp( fs->BiosParameterBlock.SystemID, "FAT32" ) != 0 )
+	{
+		free( fs );
+		return NULL;
+	}
+
+
+	
+
+	DbgPrintFmt( "Sectors per cluster: %d\n", fs->BiosParameterBlock.SectorsPerCluster );
+
+
+	
+	
+
+	
+
+	if ( iLastDriveCount == 4 )
+	{
+		DbgPrintFmt( "Cannot mount more than 4 partitions!" );
+		return NULL;
+	}
+
+	fs->LetterAssigned = LetterAssignment[ iLastDriveCount ];
+
+
+	fs->RootPath[ 0 ] = LetterAssignment[ iLastDriveCount ];
+	fs->RootPath[ 1 ] = ':';
+	iLastDriveCount++;
+
+	DbgPrintFmt( "Mounted partition: %s", fs->RootPath );
+	fs->PartitionSector = PartitionSector;
+	fs->FatSector = fs->PartitionSector + fs->BiosParameterBlock.ReservedSectors;
+	fs->ClusterSector = fs->FatSector + ( fs->BiosParameterBlock.FatCount * fs->BiosParameterBlock.SectorsPerFat32 );
+	fs->ClusterSize = 512 * fs->BiosParameterBlock.SectorsPerCluster;
+	fs->ClusterAllocationHint = 0;
+
+	// Load the FAT
+	UINT bytes_per_fat = 512 * fs->BiosParameterBlock.SectorsPerFat32;
+	fs->FAT = malloc( bytes_per_fat );
+	UINT sector_i;
+	for ( sector_i = 0; sector_i < fs->BiosParameterBlock.SectorsPerFat32; sector_i++ )
+	{
+		UCHAR sector[ 512 ];
+		FatGetSector( fs, sector, fs->FatSector + sector_i, 1 );
+		UINT integer_j;
+		for ( integer_j = 0; integer_j < 512 / 4; integer_j++ )
+		{
+			fs->FAT[ sector_i * ( 512 / 4 ) + integer_j ]
+				= UtilReadInteger32( sector, integer_j * 4 );
+		}
+	}
+	free( fs );
+	return fs;
+}
+
+VOID
+FatDestroy(
+	FAT32 *fs
 )
 {
 	DbgPrintFmt( "Destroying filesystem.\n" );
-	FatFlushFAT( );
-	free( FAT );
+	FatFlushFAT( fs );
+	free( fs->FAT );
+	free( fs );
 }
 
-//void populate_root_dir( f32 *fs, struct directory *dir )
-//{
-//	populate_dir( fs, dir, 2 );
-//}
+CONST struct BiosParameterBlockStruct*
+FatGetBiosParameterBlock(
+	FAT32 *fs
+)
+{
+	return &fs->BiosParameterBlock;
+}
 
+VOID
+FatPopulateRootDir(
+	FAT32 *fs,
+	struct Directory *dir
+)
+{
+	FatPopulateDir( fs, dir, 2 );
+}
 
-UCHAR*
+// Populates dirent with the Directory entry starting at start
+// Returns a pointer to the next 32-byte chunk after the entry
+// or NULL if either start does not point to a valid entry, or
+// there are not enough entries to build a struct DirectoryEntry
+STATIC UCHAR*
 FatReadDirectoryEntry(
+	FAT32 *fs,
 	UCHAR *start,
 	UCHAR *end,
-	struct dir_entry *dirent
+	struct DirectoryEntry *dirent
 )
 {
 	UCHAR first_byte = start[ 0 ];
@@ -538,91 +653,102 @@ FatReadDirectoryEntry(
 		// There's no long file name.
 		// Trim up the short filename.
 		dirent->name = malloc( 13 );
-		memcpy( dirent->name, entry, 11 );
+		RtlCopyMemory( dirent->name, entry, 11 );
 		dirent->name[ 11 ] = 0;
-		char extension[ 4 ];
-		memcpy( extension, dirent->name + 8, 3 );
+		CHAR extension[ 4 ];
+		RtlCopyMemory( extension, dirent->name + 8, 3 );
 		extension[ 3 ] = 0;
-		trim_spaces( extension, 3 );
+		UtilTrimSpaces( extension, 3 );
 
 		dirent->name[ 8 ] = 0;
-		trim_spaces( dirent->name, 8 );
+		UtilTrimSpaces( dirent->name, 8 );
 
 		if ( strlen( extension ) > 0 )
 		{
 			UINT len = strlen( dirent->name );
 			dirent->name[ len++ ] = '.';
-			memcpy( dirent->name + len, extension, 4 );
+			RtlCopyMemory( dirent->name + len, extension, 4 );
 		}
 	}
 
 	dirent->dir_attrs = entry[ 11 ];;
-	USHORT first_cluster_high = readi16( entry, 20 );
-	USHORT first_cluster_low = readi16( entry, 26 );
+	USHORT first_cluster_high = UtilReadInteger16( entry, 20 );
+	USHORT first_cluster_low = UtilReadInteger16( entry, 26 );
 	dirent->first_cluster = first_cluster_high << 16 | first_cluster_low;
-	dirent->file_size = readi32( entry, 28 );
+	dirent->file_size = UtilReadInteger32( entry, 28 );
 	return entry + 32;
 }
 
-
-
+// This is a complicated one. It parses a Directory entry into the DirectoryEntry pointed to by target_dirent.
+// root_cluster  must point to a buffer big enough for two clusters.
+// entry         points to the entry the caller wants to parse, and must point to a spot within root_cluster.
+// nextentry     will be modified to hold the next spot within root_entry to begin looking for entries.
+// cluster       is the cluster number of the cluster loaded into root_cluster.
+// secondcluster will be modified IF this function needs to load another cluster to continue parsing
+//               the entry, in which case, it will be set to the value of the cluster loaded.
+//
 VOID
 FatNextDirectoryEntry(
+	FAT32 *fs,
 	UCHAR *root_cluster,
 	UCHAR *entry,
 	UCHAR **nextentry,
-	struct dir_entry *target_dirent,
+	struct DirectoryEntry *target_dirent,
 	UINT cluster,
 	UINT *secondcluster
 )
 {
 
-	UCHAR *end_of_cluster = root_cluster + iClusterSize;
-	*nextentry = FatReadDirectoryEntry( entry, end_of_cluster, target_dirent );
+	UCHAR *end_of_cluster = root_cluster + fs->ClusterSize;
+	*nextentry = FatReadDirectoryEntry( fs, entry, end_of_cluster, target_dirent );
 	if ( !*nextentry )
 	{
 		// Something went wrong!
-		// Either the directory entry spans the bounds of a cluster,
-		// or the directory entry is invalid.
+		// Either the Directory entry spans the bounds of a cluster,
+		// or the Directory entry is invalid.
 		// Load the next cluster and retry.
 
 		// Figure out how much of the last cluster to "replay"
 		UINT bytes_from_prev_chunk = end_of_cluster - entry;
 
-		*secondcluster = FatGetNextClusterID( cluster );
+		*secondcluster = FatGetNextClusterID( fs, cluster );
 		if ( *secondcluster >= EOC )
 		{
-			// There's not another directory cluster to load
+			// There's not another Directory cluster to load
 			// and the previous entry was invalid!
 			// It's possible the filesystem is corrupt or... you know...
 			// my software could have bugs.
 			DbgPrintFmt( "FOUND BAD DIRECTORY ENTRY!" );
 		}
 		// Load the cluster after the previous saved entries.
-		FatGetCluster( root_cluster + iClusterSize, *secondcluster );
+		FatGetCluster( fs, root_cluster + fs->ClusterSize, *secondcluster );
 		// Set entry to its new location at the beginning of root_cluster.
-		entry = root_cluster + iClusterSize - bytes_from_prev_chunk;
+		entry = root_cluster + fs->ClusterSize - bytes_from_prev_chunk;
 
 		// Retry reading the entry.
-		*nextentry = FatReadDirectoryEntry( entry, end_of_cluster + iClusterSize, target_dirent );
+		*nextentry = FatReadDirectoryEntry( fs, entry, end_of_cluster + fs->ClusterSize, target_dirent );
 		if ( !*nextentry )
 		{
-			// Still can't parse the directory entry.
+			// Still can't parse the Directory entry.
 			// Something is very wrong.
 			DbgPrintFmt( "FAILED TO READ DIRECTORY ENTRY! THE SOFTWARE IS BUGGY!\n" );
 		}
 	}
 }
 
-
+// TODO: Refactor this. It is so similar to FatDeleteFile that it would be nice
+// to combine the similar elements.
+// WARN: If you fix a bug in this function, it's likely you will find the same
+// bug in FatDeleteFile.
 VOID
-FatPopulateDirectory(
-	struct directory *dir,
+FatPopulateDir(
+	FAT32 *fs,
+	struct Directory *dir,
 	UINT cluster
 )
 {
 	dir->cluster = cluster;
-	UINT dirs_per_cluster = iClusterSize / 32;
+	UINT dirs_per_cluster = fs->ClusterSize / 32;
 	UINT max_dirs = 0;
 	dir->entries = 0;
 	UINT entry_count = 0;
@@ -630,19 +756,19 @@ FatPopulateDirectory(
 	while ( 1 )
 	{
 		max_dirs += dirs_per_cluster;
-		dir->entries = krealloc( dir->entries, max_dirs * sizeof( struct dir_entry ) );
-		// Double the size in case we need to read a directory entry that
+		dir->entries = krealloc( dir->entries, max_dirs * sizeof( struct DirectoryEntry ) );
+		// Double the size in case we need to read a Directory entry that
 		// spans the bounds of a cluster.
-		UCHAR root_cluster[ iClusterSize * 2 ];
-		FatGetCluster( root_cluster, cluster );
+		UCHAR root_cluster[ fs->ClusterSize * 2 ];
+		FatGetCluster( fs, root_cluster, cluster );
 
 		UCHAR *entry = root_cluster;
-		while ( ( UINT )( entry - root_cluster ) < iClusterSize )
+		while ( ( UINT )( entry - root_cluster ) < fs->ClusterSize )
 		{
 			UCHAR first_byte = *entry;
 			if ( first_byte == 0x00 || first_byte == 0xE5 )
 			{
-				// This directory entry has never been written
+				// This Directory entry has never been written
 				// or it has been deleted.
 				entry += 32;
 				continue;
@@ -650,8 +776,8 @@ FatPopulateDirectory(
 
 			UINT secondcluster = 0;
 			UCHAR *nextentry = NULL;
-			struct dir_entry *target_dirent = dir->entries + entry_count;
-			FatNextDirectoryEntry(  root_cluster, entry, &nextentry, target_dirent, cluster, &secondcluster );
+			struct DirectoryEntry *target_dirent = dir->entries + entry_count;
+			FatNextDirectoryEntry( fs, root_cluster, entry, &nextentry, target_dirent, cluster, &secondcluster );
 			entry = nextentry;
 			if ( secondcluster )
 			{
@@ -660,54 +786,59 @@ FatPopulateDirectory(
 
 			entry_count++;
 		}
-		cluster = FatGetNextClusterID( cluster );
+		cluster = FatGetNextClusterID( fs, cluster );
 		if ( cluster >= EOC ) break;
 	}
 	dir->num_entries = entry_count;
 }
 
-VOID
+STATIC VOID
 FatZeroFatChain(
+	FAT32 *fs,
 	UINT start_cluster
 )
 {
 	UINT cluster = start_cluster;
 	while ( cluster < EOC && cluster != 0 )
 	{
-		UINT next_cluster = FAT[ cluster ];
-		FAT[ cluster ] = 0;
+		UINT next_cluster = fs->FAT[ cluster ];
+		fs->FAT[ cluster ] = 0;
 		cluster = next_cluster;
 	}
-	FatFlushFAT( );
+	FatFlushFAT( fs );
 }
 
-
-VOID 
-FatDeleteFile( 
-	struct directory *dir,
+// TODO: Refactor this. It is so similar to FatPopulateDir that it would be nice
+// to combine the similar elements.
+// WARN: If you fix a bug in this function, it's likely you will find the same
+// bug in FatPopulateDir.
+VOID
+FatDeleteFile(
+	FAT32 *fs,
+	struct Directory *dir,
 	CHAR *filename
 )
-{ //struct dir_entry *dirent) {
+{ //struct DirectoryEntry *dirent) {
 	UINT cluster = dir->cluster;
 
-	// Double the size in case we need to read a directory entry that
+	// Double the size in case we need to read a Directory entry that
 	// spans the bounds of a cluster.
-	UCHAR root_cluster[ iClusterSize * 2 ];
-	struct dir_entry target_dirent;
+	UCHAR root_cluster[ fs->ClusterSize * 2 ];
+	struct DirectoryEntry target_dirent;
 
-	// Try to locate and invalidate the directory entries corresponding to the
+	// Try to locate and invalidate the Directory entries corresponding to the
 	// filename in dirent.
 	while ( 1 )
 	{
-		FatGetCluster( root_cluster, cluster );
+		FatGetCluster( fs, root_cluster, cluster );
 
 		UCHAR *entry = root_cluster;
-		while ( ( UINT )( entry - root_cluster ) < iClusterSize )
+		while ( ( UINT )( entry - root_cluster ) < fs->ClusterSize )
 		{
 			UCHAR first_byte = *entry;
 			if ( first_byte == 0x00 || first_byte == 0xE5 )
 			{
-				// This directory entry has never been written
+				// This Directory entry has never been written
 				// or it has been deleted.
 				entry += 32;
 				continue;
@@ -715,19 +846,19 @@ FatDeleteFile(
 
 			UINT secondcluster = 0;
 			UCHAR *nextentry = NULL;
-			FatNextDirectoryEntry( root_cluster, entry, &nextentry, &target_dirent, cluster, &secondcluster );
+			FatNextDirectoryEntry( fs, root_cluster, entry, &nextentry, &target_dirent, cluster, &secondcluster );
 
 			// We have a target dirent! see if it's the one we want!
 			if ( strcmp( target_dirent.name, filename ) == 0 )
 			{
 				// We found it! Invalidate all the entries.
-				memset( entry, 0, nextentry - entry );
-				FatPutCluster( root_cluster, cluster );
+				RtlSetMemory( entry, 0, nextentry - entry );
+				FatPutCluster( fs, root_cluster, cluster );
 				if ( secondcluster )
 				{
-					FatPutCluster( root_cluster +  iClusterSize, secondcluster );
+					FatPutCluster( fs, root_cluster + fs->ClusterSize, secondcluster );
 				}
-				FatZeroFatChain( target_dirent.first_cluster );
+				FatZeroFatChain( fs, target_dirent.first_cluster );
 				free( target_dirent.name );
 				return;
 			}
@@ -743,14 +874,15 @@ FatDeleteFile(
 			free( target_dirent.name );
 
 		}
-		cluster = FatGetNextClusterID( cluster );
+		cluster = FatGetNextClusterID( fs, cluster );
 		if ( cluster >= EOC ) return;
 	}
 }
 
 VOID
-FatFreeDirectory( 
-	struct directory *dir
+FatFreeDirectory(
+	FAT32 *fs,
+	struct Directory *dir
 )
 {
 	UINT i;
@@ -762,37 +894,38 @@ FatFreeDirectory(
 }
 
 UCHAR*
-FatReadFile( 
-	struct dir_entry *dirent
+FatReadFile(
+	FAT32 *fs,
+	struct DirectoryEntry *dirent
 )
 {
-	uint8_t *file = malloc( dirent->file_size );
-	uint8_t *filecurrptr = file;
-	uint32_t cluster = dirent->first_cluster;
-	uint32_t copiedbytes = 0;
+	UCHAR *file = malloc( dirent->file_size );
+	UCHAR *filecurrptr = file;
+	UINT cluster = dirent->first_cluster;
+	UINT copiedbytes = 0;
 	while ( 1 )
 	{
-		uint8_t cbytes[ iClusterSize ];
-		FatGetCluster( cbytes, cluster );
+		UCHAR cbytes[ fs->ClusterSize ];
+		FatGetCluster( fs, cbytes, cluster );
 
-		uint32_t remaining = dirent->file_size - copiedbytes;
-		uint32_t to_copy = remaining > iClusterSize ? iClusterSize : remaining;
+		UINT remaining = dirent->file_size - copiedbytes;
+		UINT to_copy = remaining > fs->ClusterSize ? fs->ClusterSize : remaining;
 
-		memcpy( filecurrptr, cbytes, to_copy );
+		RtlCopyMemory( filecurrptr, cbytes, to_copy );
 
-		filecurrptr += iClusterSize;
+		filecurrptr += fs->ClusterSize;
 		copiedbytes += to_copy;
 
-		cluster = FatGetNextClusterID( cluster );
+		cluster = FatGetNextClusterID( fs, cluster );
 		if ( cluster >= EOC ) break;
 	}
 	return file;
 }
 
-
-VOID
+STATIC VOID
 FatWriteFileImplementation(
-	struct directory *dir,
+	FAT32 *fs,
+	struct Directory *dir,
 	UCHAR *file,
 	CHAR *fname,
 	UINT flen,
@@ -800,8 +933,8 @@ FatWriteFileImplementation(
 	UINT setcluster
 )
 {
-	UINT required_clusters = flen / iClusterSize;
-	if ( flen % iClusterSize != 0 ) required_clusters++;
+	UINT required_clusters = flen / fs->ClusterSize;
+	if ( flen % fs->ClusterSize != 0 ) required_clusters++;
 	if ( required_clusters == 0 ) required_clusters++; // Allocate at least one cluster.
 	// One for the traditional 8.3 name, one for each 13 charaters in the extended name.
 	// Int division truncates, so if there's a remainder from length / 13, add another entry.
@@ -814,8 +947,8 @@ FatWriteFileImplementation(
 	UINT required_entries_total = required_entries_long_fname + 1;
 
 	UINT cluster; // The cluster number that the entries are found in
-	UCHAR root_cluster[ iClusterSize ];
-	UCHAR *start_entries = FatLocateEntries( root_cluster, dir, required_entries_total, &cluster );
+	UCHAR root_cluster[ fs->ClusterSize ];
+	UCHAR *start_entries = FatLocateEntries( fs, root_cluster, dir, required_entries_total, &cluster );
 	FatWriteLongFileNameEntries( start_entries, required_entries_long_fname, fname );
 
 	// Write the actual file entry;
@@ -837,24 +970,24 @@ FatWriteFileImplementation(
 	{
 		for ( i = 0; i < required_clusters; i++ )
 		{
-			UINT currcluster = FatAllocateCluster( );
+			UINT currcluster = FatAllocCluster( fs );
 			if ( !firstcluster )
 			{
 				firstcluster = currcluster;
 			}
-			UCHAR cluster_buffer[ iClusterSize ];
-			memset( cluster_buffer, 0, iClusterSize );
-			uint32_t bytes_to_write = flen - writtenbytes;
-			if ( bytes_to_write > iClusterSize )
+			UCHAR cluster_buffer[ fs->ClusterSize ];
+			RtlSetMemory( cluster_buffer, 0, fs->ClusterSize );
+			UINT bytes_to_write = flen - writtenbytes;
+			if ( bytes_to_write > fs->ClusterSize )
 			{
-				bytes_to_write = iClusterSize;
+				bytes_to_write = fs->ClusterSize;
 			}
-			memcpy( cluster_buffer, file + writtenbytes, bytes_to_write );
+			RtlCopyMemory( cluster_buffer, file + writtenbytes, bytes_to_write );
 			writtenbytes += bytes_to_write;
-			FatPutCluster( cluster_buffer, currcluster );
+			FatPutCluster( fs, cluster_buffer, currcluster );
 			if ( prevcluster )
 			{
-				FAT[ prevcluster ] = currcluster;
+				fs->FAT[ prevcluster ] = currcluster;
 			}
 			prevcluster = currcluster;
 		}
@@ -882,60 +1015,52 @@ FatWriteFileImplementation(
 	actual_entry[ 31 ] = ( flen >> 24 ) & 0xFF;
 
 	// Write the cluster back to disk
-	FatPutCluster( root_cluster, cluster );
-	FatFlushFAT( );
+	FatPutCluster( fs, root_cluster, cluster );
+	FatFlushFAT( fs );
 }
 
 VOID
-FatWriteFile( 
-	struct directory *dir,
+FatWriteFile(
+	FAT32 *fs,
+	struct Directory *dir,
 	UCHAR *file,
 	CHAR *fname,
 	UINT flen
 )
 {
-	FatWriteFileImplementation( dir, file, fname, flen, 0, 0 );
+	FatWriteFileImplementation( fs, dir, file, fname, flen, 0, 0 );
 }
 
 VOID
-FatMakeDirSubDirs(
-	struct directory *dir,
-	UCHAR parentcluster
-)
-{
-	FatWriteFileImplementation( dir, NULL, ".", 0, DIRECTORY, dir->cluster );
-	FatWriteFileImplementation( dir, NULL, "..", 0, DIRECTORY, parentcluster );
-}
-
-
-VOID
-FatMakeDir( 
-	struct directory *dir,
+FatMakeDirectory(
+	FAT32 *fs,
+	struct Directory *dir,
 	CHAR *dirname
 )
 {
-	FatWriteFileImplementation( dir, NULL, dirname, 0, DIRECTORY, 0 );
+	FatWriteFileImplementation( fs, dir, NULL, dirname, 0, DIRECTORY, 0 );
 
 	// We need to add the subdirectories '.' and '..'
-	struct directory subdir;
-	FatPopulateDirectory( &subdir, dir->cluster );
+	struct Directory subdir;
+	FatPopulateDir( fs, &subdir, dir->cluster );
 	UINT i;
 	for ( i = 0; i < subdir.num_entries; i++ )
 	{
 		if ( strcmp( subdir.entries[ i ].name, dirname ) == 0 )
 		{
-			struct directory newsubdir;
-			FatPopulateDirectory( &newsubdir, subdir.entries[ i ].first_cluster );
-			FatMakeDirSubDirs( &newsubdir, subdir.cluster );
-			FatFreeDirectory( &newsubdir );
+			struct Directory newsubdir;
+			FatPopulateDir( fs, &newsubdir, subdir.entries[ i ].first_cluster );
+
+			FatFreeDirectory( fs, &newsubdir );
 		}
 	}
-	FatFreeDirectory( &subdir );
+	FatFreeDirectory( fs, &subdir );
 }
 
 VOID
 FatPrintDirectory(
-	struct directory *dir
+	FAT32 *fs,
+	struct Directory *dir
 )
 {
 	UINT i;
@@ -946,10 +1071,10 @@ FatPrintDirectory(
 		max_name = namelen > max_name ? namelen : max_name;
 	}
 
-	char *namebuff = malloc( max_name + 1 );
+	CHAR *namebuff = malloc( max_name + 1 );
 	for ( i = 0; i < dir->num_entries; i++ )
 	{
-		//        printf("[%d] %*s %c %8d bytes ",
+		//        DbgPrintFmt("[%d] %*s %c %8d bytes ",
 		//               i,
 		//               -max_name,
 		//               dir->entries[i].name,
@@ -978,13 +1103,14 @@ FatPrintDirectory(
 		UINT cluster_count = 1;
 		while ( 1 )
 		{
-			cluster = FAT[ cluster ];
+			cluster = fs->FAT[ cluster ];
 			if ( cluster >= EOC ) break;
 			if ( cluster == 0 )
 			{
 				DbgPrintFmt( "BAD CLUSTER CHAIN! FS IS CORRUPT!" );
 			}
-			cluster_count++;
+			else cluster_count++;
+			
 		}
 		DbgPrintFmt( "clusters: [%d]\n", cluster_count );
 	}
@@ -992,16 +1118,16 @@ FatPrintDirectory(
 }
 
 UINT
-FatCountFreeClusters(
-
+FatGetFreeClusters(
+	FAT32 *fs
 )
 {
-	UINT clusters_in_fat = ( (UINT)FatDiskBPB->ExtendedBootRecord.SectorsPerFat * 512 ) / 4;
+	UINT clusters_in_fat = ( fs->BiosParameterBlock.SectorsPerFat32 * 512 ) / 4;
 	UINT i;
 	UINT count = 0;
 	for ( i = 0; i < clusters_in_fat; i++ )
 	{
-		if ( FAT[ i ] == 0 )
+		if ( fs->FAT[ i ] == 0 )
 		{
 			count++;
 		}

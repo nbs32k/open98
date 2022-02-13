@@ -1,5 +1,5 @@
 #pragma once
-#include "../../windef.h"
+#include "../../ntdef.h"
 #include "../io/io.h"
 #define PIC1 0x20
 #define PIC2 0xA0

@@ -389,7 +389,7 @@ typedef struct boot_rsdp
 #undef _stivale2_split64
 
 
-#include "windef.h"
+#include "ntdef.h"
 
 
 

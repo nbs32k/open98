@@ -9,7 +9,7 @@ DEFINE_LOCK( vmm_lock );
 DEFINE_LOCK( pagemap_lock );
 
 
-pagemap_t kernel_pagemap;
+pagemap_t MiKernelPage;
 
 static ULONG64 *vmm_get_next_level( ULONG64 *table, size_t index,
 									ULONG64 flags )
@@ -149,8 +149,12 @@ void vmm_memcpy( pagemap_t *pagemap_1, uintptr_t virtual_address_1,
 		}
 	}
 }
-
-void vmm_load_pagemap( pagemap_t *pagemap )
+void MmLoadVirtualPage2( ULONG64 pml4 )
+{
+	/* in long mode, the CR3 register is used to point to the PML4 base address */
+	asm( "mov %0, %%cr3" ::"a"( pml4 ) );
+}
+void MmLoadVirtualPage( pagemap_t *pagemap )
 {
 	asm volatile( "mov %0, %%cr3" : : "a"( pagemap->top_level ) );
 }
@@ -161,7 +165,7 @@ pagemap_t *vmm_create_new_pagemap( )
 	new_map->top_level = pcalloc( 1 );
 
 	ULONG64 *kernel_top =
-		( ULONG64 * )( ( void * )kernel_pagemap.top_level + PHYS_MEM_OFFSET );
+		( ULONG64 * )( ( void * )MiKernelPage.top_level + PHYS_MEM_OFFSET );
 	ULONG64 *user_top =
 		( ULONG64 * )( ( void * )new_map->top_level + PHYS_MEM_OFFSET );
 
@@ -171,29 +175,29 @@ pagemap_t *vmm_create_new_pagemap( )
 	for ( uintptr_t i = 0;
 		 i < ( uintptr_t )( KiVBEData.Width * KiVBEData.Height * sizeof( uint32_t ) ); i += PAGE_SIZE )
 		vmm_map_page(
-			new_map, vmm_virt_to_phys( &kernel_pagemap, ( uintptr_t )KiVBEData.Address ) + i,
-			vmm_virt_to_phys( &kernel_pagemap, ( uintptr_t )KiVBEData.Address ) + i, 0b111 );
+			new_map, vmm_virt_to_phys( &MiKernelPage, ( uintptr_t )KiVBEData.Address ) + i,
+			vmm_virt_to_phys( &MiKernelPage, ( uintptr_t )KiVBEData.Address ) + i, 0b111 );
 
 	return new_map;
 }
 
 int MmInitializeVmm( )
 {
-	kernel_pagemap.top_level = ( ULONG64 * )pcalloc( 1 );
+	MiKernelPage.top_level = ( ULONG64 * )pcalloc( 1 );
 
 	for ( ULONG64 i = 256; i < 512; i++ )
-		vmm_get_next_level( kernel_pagemap.top_level, i, 0b111 );
+		vmm_get_next_level( MiKernelPage.top_level, i, 0b111 );
 
 	for ( uintptr_t i = PAGE_SIZE; i < 0x100000000; i += PAGE_SIZE )
 	{
-		vmm_map_page( &kernel_pagemap, i, i, 0b11 );
-		vmm_map_page( &kernel_pagemap, i, i + PHYS_MEM_OFFSET, 0b11 );
+		vmm_map_page( &MiKernelPage, i, i, 0b11 );
+		vmm_map_page( &MiKernelPage, i, i + PHYS_MEM_OFFSET, 0b11 );
 	}
 
 	for ( uintptr_t i = 0; i < 0x80000000; i += PAGE_SIZE )
-		vmm_map_page( &kernel_pagemap, i, i + KERNEL_MEM_OFFSET, 0b111 );
+		vmm_map_page( &MiKernelPage, i, i + KERNEL_MEM_OFFSET, 0b111 );
 
-	vmm_load_pagemap( &kernel_pagemap );
+	MmLoadVirtualPage( &MiKernelPage );
 
 	return 0;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windef.h>
+#include <ntdef.h>
 #include "../../ke/ki.h"
 #include "../../lib/utill.h"
 #include <lib/vec.h>

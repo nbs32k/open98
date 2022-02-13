@@ -1,6 +1,7 @@
 #include "drv.h"
 #include "../hal/hal.h"
 #include "../ke/ki.h"
+#include "../mod/module.h"
 
 BOOLEAN KiCapsLock = FALSE;
 BOOLEAN KiShiftPress = FALSE;
@@ -19,12 +20,15 @@ KiUpdateKeyboard(
 {
 	UCHAR ucScanCode;
 	
-	DbgPrintFmt("focking keyboard" );
+	//DbgPrintFmt("focking keyboard" );
 	ucScanCode = inb( 0x60 );
 	KiKeyboardUsed = TRUE;
 	
 	switch ( ucScanCode )
 	{
+		case KEY_F1:
+			//DwmSetObjectPosition( DwmGetWindowUnderCursor( ), 10, 10 );
+			break;
 		case KEY_CAPS_LOCK:
 			if ( KiCapsLock == FALSE )
 			{

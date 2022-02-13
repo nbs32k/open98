@@ -2,8 +2,34 @@
 #include "../ntuser/ntuser.h"
 #include "../hal/hal.h"
 
+#include "../mod/module.h"
 
 INT KiMouseState = 0;
+
+UCHAR prev_button_state[ 3 ];
+UCHAR curr_button_state[ 3 ];
+
+int left_button_down( )
+{
+	return !prev_button_state[ 0 ] && curr_button_state[ 0 ];
+}
+
+int right_button_down( )
+{
+	return !prev_button_state[ 2 ] && curr_button_state[ 2 ];
+}
+
+int left_button_up( )
+{
+	return prev_button_state[ 0 ] && !curr_button_state[ 0 ];
+}
+
+int right_button_up( )
+{
+	return prev_button_state[ 2 ] && !curr_button_state[ 2 ];
+}
+
+
 
 VOID
 KiWaitMouse(
@@ -99,6 +125,8 @@ KiHandlePS2Mouse(
 	}
 }
 
+
+
 VOID
 KiProcessMouse(
 
@@ -107,6 +135,7 @@ KiProcessMouse(
 	if ( !bMousePacketReady )
 		return;
 	//if (isKeyboardUsed) return;
+
 
 	BOOLEAN xNegative, yNegative, xOverflow, yOverflow;
 
@@ -184,6 +213,9 @@ KiProcessMouse(
 	if ( KiMousePosition.Y > KiVBEData.Height - 1 )
 		KiMousePosition.Y = KiVBEData.Height - 1;
 
+
+
+
 	//ClearMouseCursor(MousePointer, pMousePositionOld);
 
 	//DrawOverlayMouseCursor(MousePointer, KiMousePosition, 0xffffff);
@@ -194,9 +226,19 @@ KiProcessMouse(
 		//GlobalRenderer->PutChar('a', KiMousePosition.X, KiMousePosition.Y);
 		KiMouseState = MOUSE_LEFT_CLICK;
 
+		//curr_button_state[ 0 ] = 1;
+		
 		//dragging
+		//DbgPrintFmt("%d", DwmGetWindowUnderCursor( ) );
 
-		//WindowPacketSend( KiMousePosition );
+		//DraggedWindowID = DwmGetWindowUnderCursor( );
+			//DwmSetObjectPosition( WinID, lolX, lolY );
+		
+	}
+	else
+	{
+		
+		//curr_button_state[ 0 ] = 0;
 	}
 	if ( KiMousePacket[ 0 ] & PS2Middlebutton )
 	{
@@ -205,17 +247,28 @@ KiProcessMouse(
 	if ( KiMousePacket[ 0 ] & PS2Rightbutton )
 	{
 		KiMouseState = MOUSE_RIGHT_CLICK;
-		//UINT colour = GlobalRenderer->Colour;
-		//GlobalRenderer->Colour = 0x0000ff00;
-		//GlobalRenderer->PutChar('a', KiMousePosition.X, KiMousePosition.Y);
-		//GlobalRenderer->Colour = colour;
+
+		curr_button_state[ 2 ] = 1;
+	}
+	else
+	{
+		curr_button_state[ 2 ] = 0;
 	}
 
+
+	////////////////////////////
+	///////////////////////////
+	/////////////////////////
+
+	
 	NtSetCursorPos( KiMousePosition.X, KiMousePosition.Y );
 
 	KiMouseState = 0; // reset mouse state
+	
+
 	bMousePacketReady = FALSE;
 	pMousePositionOld = KiMousePosition;
+
 }
 
 

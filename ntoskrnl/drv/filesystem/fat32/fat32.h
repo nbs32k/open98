@@ -1,52 +1,41 @@
 #pragma once
-#include <windef.h>
+#include <ntdef.h>
+#include <stdint.h>
+#include <lib/utill.h>
+#include <drv/filesystem/storage.h>
 
-typedef struct 
+
+STATIC UCHAR LetterAssignment[ 4 ] = { 'C', 'D', 'E', 'F' };
+
+struct BiosParameterBlockStruct
 {
+	USHORT BytesPerSector;          // IMPORTANT
+	UCHAR SectorsPerCluster;        // IMPORTANT
+	USHORT ReservedSectors;          // IMPORTANT
+	UCHAR FatCount;                  // IMPORTANT
+	USHORT DirectoryEntries;
+	USHORT TotalSectors;
+	UCHAR MediaDescriptorType;
+	USHORT SectorsPerFat; // FAT12/FAT16 only.
+	USHORT SectorsPerTrack;
+	USHORT HeadsOrSizesOnMedia;
+	UINT HiddenSectors;
+	UINT LargeSectorsOnMedia;  // This is set instead of TotalSectors if it's > 65535
 
-	UCHAR SectorsPerFat[ 4 ]; // 4
-	USHORT Flags; //2
-	USHORT FatVerNumber; //2
-	UCHAR ClusterNumberOfRoot[ 4 ]; //4
-	USHORT SectorNumberFSInfo; //2
-	USHORT SectorBackupBoot; //2
-	UCHAR Reserved[ 12 ]; //12
-	UCHAR DriveNumber;//1
-	UCHAR FlagsNT;//1
-	UCHAR Signature;//1
-	UCHAR VolumeIDSerial[ 4 ];//4
-	UCHAR VolumeLabel[ 11 ];//11
-	UCHAR SystemIdentifier[ 8 ];//8
-	UCHAR BootCode[ 420 ];//420
-	USHORT BiosSignature;//2
-	//476 Bytes
-
-}__attribute__( ( packed ) ) ExtendedFat32;
-
-
-typedef struct BiosParameterBlock
-{
-
-	UCHAR JumpCode[ 3 ]; //3
-	UCHAR OEMIdentifier[ 8 ]; //8
-	USHORT BytesPerSector; //2
-	UCHAR SectorsPerCluster; //1
-	USHORT ReservedSectorCount; //2
-	UCHAR NumberOfFAT; //1
-	USHORT NumberDirectories; //2
-	USHORT TotalSectors; //2
-	UCHAR MediaDescriptorType; //1
-	USHORT NumberOfSectors;	//2	//only FAT12/16
-	USHORT NumberOfSPT;	//2		//nSectors Per Track
-	USHORT NumberOfHeads; //2
-	UCHAR NumbersOfHiddenSectors[ 4 ];//4
-	UCHAR LargeSectorCount[ 4 ];//4
-	//36 Bytes
-
-	ExtendedFat32 ExtendedBootRecord;
-
-}__attribute__( ( packed ) ) BPBTable;
-
+	// Extended Boot Record
+	UINT SectorsPerFat32;   // IMPORTANT
+	USHORT flags;
+	USHORT FatVersion;
+	UINT ClusterRootDirectory;   // IMPORTANT
+	USHORT FSInfoSectorNumber;
+	USHORT BackupBootSectorNumber;
+	UCHAR DriveNumber;
+	UCHAR WindowsFlags;
+	UCHAR Signature;                  // IMPORTANT
+	UINT VolumeSerial;
+	CHAR VolumeLabel[ 12 ];
+	CHAR SystemID[ 9 ];
+};
 
 #define READONLY  1
 #define HIDDEN    (1 << 1)
@@ -56,7 +45,7 @@ typedef struct BiosParameterBlock
 #define ARCHIVE   (1 << 5)
 #define LFN (READONLY | HIDDEN | SYSTEM | VolumeID)
 
-struct dir_entry
+struct DirectoryEntry
 {
 	CHAR *name;
 	UCHAR dir_attrs;
@@ -64,17 +53,161 @@ struct dir_entry
 	UINT file_size;
 };
 
-struct directory
+struct Directory
 {
 	UINT cluster;
-	struct dir_entry *entries;
+	struct DirectoryEntry *entries;
 	UINT num_entries;
 };
 
+// REFACTOR
+// I want to get rid of this from the header. This should be internal
+// implementation, but for now, it's too convenient for stdio.c impl.
+
+// EOC = End Of Chain
+#define EOC 0x0FFFFFF8
+
+typedef struct FAT32
+{
+	//FILE *f;
+	UCHAR LetterAssigned; //C
+	UCHAR RootPath[ 2 ];
+	UINT *FAT;
+	struct BiosParameterBlockStruct BiosParameterBlock;
+	UINT PartitionSector; //Where does the partition start from (sector number)
+	UINT FatSector;
+	UINT ClusterSector;
+	UINT ClusterSize;
+	UINT ClusterAllocationHint;
+}FAT32;
+
+INT iLastDriveCount; //extern
+
+VOID
+FatGetCluster(
+	FAT32 *fs,
+	UCHAR *buff,
+	UINT cluster_number
+);
+
+UINT
+FatGetNextClusterID(
+	FAT32 *fs,
+	UINT cluster
+);
+
+// END REFACTOR
+
+FAT32*
+FatInitialize(
+	INT iPartitionNumber
+);
+VOID
+FatDestroy(
+	FAT32 *fs
+);
+
+
+
+CONST struct BiosParameterBlockStruct*
+FatGetBiosParameterBlock(
+	FAT32 *fs
+);
+
+VOID
+FatPopulateRootDir(
+	FAT32 *fs,
+	struct Directory *dir
+);
+
+VOID
+FatPopulateDir(
+	FAT32 *fs,
+	struct Directory *dir,
+	UINT cluster
+);
+
+VOID
+FatFreeDirectory(
+	FAT32 *fs,
+	struct Directory *dir
+);
+
+
+UCHAR*
+FatReadFile(
+	FAT32 *fs,
+	struct DirectoryEntry *dirent
+);
+
+VOID
+FatWriteFile(
+	FAT32 *fs,
+	struct Directory *dir,
+	UCHAR *file,
+	CHAR *fname,
+	UINT flen
+);
+VOID
+FatMakeDirectory(
+	FAT32 *fs,
+	struct Directory *dir,
+	CHAR *dirname
+);
+
+VOID
+FatDeleteFile(
+	FAT32 *fs,
+	struct Directory *dir,
+	CHAR *filename
+);
 
 
 VOID
-FatInitialize(
-
+FatPrintDirectory(
+	FAT32 *fs,
+	struct Directory *dir
 );
 
+UINT
+FatGetFreeClusters(
+	FAT32 *fs
+);
+
+extern FAT32 *Partition[4];
+
+
+FAT32*
+FatResolveByPrefix(
+	CHAR* pcPath
+);
+
+#define MAX_PARTITION 4
+
+/////
+typedef struct FILE FILE;
+
+FILE*
+fopen(
+	const CHAR *pathname,
+	const CHAR *mode
+);
+
+static inline INT
+FileEntryForPath(
+	const CHAR *path,
+	struct DirectoryEntry *entry
+);
+
+INT
+fclose(
+	FILE *stream
+);
+
+INT
+fread(
+	void *ptr,
+	INT size,
+	INT nmemb,
+	FILE *stream
+);

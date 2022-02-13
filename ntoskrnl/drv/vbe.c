@@ -3,8 +3,7 @@
 #include "../stivale2.h"
 #include "../lib/printf.h"
 
-UCHAR
-KiDisplayFont[ 4096 ];
+
 
 KVBE_STRUCTURE KiVBEData = { 0 };
 

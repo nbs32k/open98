@@ -1,5 +1,5 @@
 #pragma once
-#include "../windef.h"
+#include "../ntdef.h"
 
 #include <stdint.h>
 #include "../lib/utill.h"
@@ -16,9 +16,9 @@ typedef struct pagemap
 	ULONG64 *top_level;
 } pagemap_t;
 
-extern pagemap_t kernel_pagemap;
+extern pagemap_t MiKernelPage;
 
-void vmm_load_pagemap( pagemap_t *pagemap );
+void MmLoadVirtualPage( pagemap_t *pagemap );
 pagemap_t *vmm_create_new_pagemap( );
 void vmm_map_page( pagemap_t *pagemap, uintptr_t physical_address,
 				  uintptr_t virtual_address, ULONG64 flags );
@@ -29,6 +29,8 @@ void vmm_memcpy( pagemap_t *pagemap_1, uintptr_t virtual_address_1,
 uintptr_t vmm_virt_to_phys( pagemap_t *pagemap, uintptr_t virtual_address );
 uintptr_t vmm_get_kernel_address( pagemap_t *pagemap, uintptr_t virtual_address );
 int MmInitializeVmm( );
+
+void MmLoadVirtualPage2( ULONG64 pml4 );
 
 
 

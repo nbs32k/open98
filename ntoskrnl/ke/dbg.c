@@ -1,4 +1,4 @@
-#include "../windef.h"
+#include "../ntdef.h"
 #include "ki.h"
 #include "../lib/printf.h"
 

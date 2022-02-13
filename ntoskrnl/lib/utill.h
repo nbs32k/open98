@@ -1,5 +1,5 @@
 #pragma once
-#include "../windef.h"
+#include "../ntdef.h"
 #include "printf.h"
 #include "../mm/mm.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../windef.h"
+#include "../ntdef.h"
 #include "gdt/gdt.h"
 #include "io/io.h"
 #include "idt/idt.h"

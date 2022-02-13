@@ -124,7 +124,7 @@ KiATAIdentify(
 	}
 
 	DbgPrintFmt( "Reading IDENTIFY structure.\n" );
-	//UCHAR *buff = kmalloc(40960, 0, NULL);
+	//UCHAR *buff = malloc(40960, 0, NULL);
 	UCHAR buff[ 256 * 2 ];
 	insw( ATA_PRIMARY_DATA, buff, 256 );
 	DbgPrintFmt( "Success. Disk is ready to go.\n" );

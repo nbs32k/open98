@@ -22,12 +22,20 @@ KiGetTickCount(
 	return ulTick;
 }
 
+#include "../mod/module.h"
+
+INT BaseFrequency = 1193180;
+INT div = 50;
+CHAR timepre = 0;
 STATIC VOID
 KiUpdateTick(
 	struct InterruptRegisters *reg
 )
 {
-	//PsScheduleThreads( reg );
+	PsScheduleThreads( reg );
+
+	DwmRefreshBuffer( );
+	
 	ulTick++;
 }
 
@@ -42,7 +50,7 @@ HalInitPIT(
 	);
 	
 
-	ULONG64 ulDivisor = ( ULONG64 )( 1193180 / 50 );
+	ULONG64 ulDivisor = ( ULONG64 )( BaseFrequency / div );
 
 	UCHAR ucLow = ( UCHAR )( ulDivisor & 0xFF );
 	UCHAR ucHigh = ( UCHAR )( ( ulDivisor >> 8 ) & 0xFF );
