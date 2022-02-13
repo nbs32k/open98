@@ -8,6 +8,6 @@
     "\\ntoskrnl\\mod",
     "\\ntoskrnl\\ntuser"
   ],
-  "SelectedNode": "\\ntoskrnl\\drv\\mouse.c",
+  "SelectedNode": "\\ntoskrnl\\mod\\draw.c",
   "PreviewInSolutionExplorer": false
 }
