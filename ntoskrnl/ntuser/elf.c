@@ -1,6 +1,6 @@
 #include "ntuser.h"
 #include "../fsrtl/fsrtl.h"
-
+//https://github.com/NSG650/Polaris/blob/master/kernel/sys/elf.c
 static const char *ELF_SECTION_TYPE[ ] = {
 	"NULL",	   "PROGBITS", "SYMTAB", "STRTAB", "RELA", "HASH",
 	"DYNAMIC", "NOTE",	   "NOBITS", "REL",	   "",	   "DYNSYM" };
