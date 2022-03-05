@@ -95,11 +95,11 @@ end:
 
 		/* remember that the PsScheduleThreads function was called because an IRQ0 was issued, then, we need to
 		 * mark the INTerrupt as correctly handled */
-		outb( PIC1, PIC_EOI );
+		//outb( PIC1, PIC_EOI );
 
 		/* now that we marked the task as running, we need to actually make the switch, before that,
 		 * we need to load the task's pagemap INTo CR3 */
-		//MmLoadVirtualPage( ( ULONG64 )tasks[ iNext ].page_map );
+		//MmLoadVirtualPage( tasks[iNext].page_map );
 		pop_regs( &tasks[ iNext ].regs ); /* restore task registers and make the switch */
 	}
 }

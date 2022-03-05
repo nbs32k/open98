@@ -7,5 +7,5 @@ IF /I "%AREYOUSURE%" NEQ "Y" GOTO END
 pause
 
 :END
-"C:\Program Files\qemu\qemu-system-x86_64.exe" -debugcon stdio -m 2G -accel whpx -rtc base=localtime disk.iso
+"C:\Program Files\qemu\qemu-system-x86_64.exe" -debugcon stdio -m 8G -accel whpx -rtc base=localtime disk.iso
 pause

@@ -1,5 +1,6 @@
 #pragma once
 #include <ntdef.h>
+#include <stddef.h>
 
 
 BOOLEAN
@@ -12,9 +13,6 @@ DwmRefreshBuffer(
 
 );
 
-UINT*			DwmAntiBuffer;
-INT				DwmScreenPitch;
-
 VOID
 DwmDrawFilled(
 	UINT uiXStart,
@@ -23,3 +21,27 @@ DwmDrawFilled(
 	UINT uiYEnd,
 	UINT uiColor
 );
+INT				DwmScreenPitch;
+UINT*			DwmAntiBuffer;
+
+VOID
+DwmSetWindowPos(
+	INT WindowID,
+	INT NewX,
+	INT NewY
+);
+
+INT
+DwmAcquireCursorWindow(
+
+);
+
+VOID
+DwmDisplayString(
+	CHAR* pcString,
+	UINT  uiX,
+	UINT  uiY,
+	UINT  uiColor
+);
+
+BOOLEAN			bRefreshBuffer;

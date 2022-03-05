@@ -22,26 +22,32 @@ FileEntryForPath(
 
 	UCHAR* RemainingPath = malloc( sizeof( path ) );
 	RtlCopyMemory( RemainingPath, path + 2, RtlStringLength( path ) - 2 );
-	//DbgPrintFmt( "Drive prefix: %s\nRemaining Path: %s", 0, RemainingPath );
+	DbgPrintFmt( "Drive prefix: %s\nRemaining Path: %s", 0, RemainingPath );
 
 
 	FAT32* filesystem = FatResolveByPrefix( path );
 	if ( filesystem == NULL ) return 0;
 
+	DbgPrintFmt( "DAWG1" );
 	FatPopulateRootDir( filesystem, &dir );
 	INT found_file = 0;
 	/*if ( path[ 0 ] != '/' )*/
+
+	DbgPrintFmt( "DAWG2" );
 	if ( RemainingPath[ 0 ] != '\\' )
 	{
 		return found_file;
 	}
-
+	DbgPrintFmt( "DAWG3" );
 	CHAR *cutpath = strdup( RemainingPath );
 	CHAR *tokstate = NULL;
+	DbgPrintFmt( "DAWG4" );
+
 	//CHAR *next_dir = strtok_r( cutpath, "/", &tokstate );
 	CHAR *next_dir = strtok_r( cutpath, "\\", &tokstate );
 	struct DirectoryEntry *currentry = NULL;
 	entry->name = NULL;
+	DbgPrintFmt( "DAWG5" );
 	while ( next_dir )
 	{
 		INT found = 0;
@@ -57,7 +63,9 @@ FileEntryForPath(
 
 				INT cluster = currentry->first_cluster;
 				FatFreeDirectory( filesystem, &dir );
+				DbgPrintFmt( "DAWG6" );
 				FatPopulateDir( filesystem, &dir, cluster );
+				DbgPrintFmt( "DAWG7" );
 				found = 1;
 				break;
 
@@ -67,12 +75,15 @@ FileEntryForPath(
 		{
 			free( cutpath );
 			FatFreeDirectory( FatResolveByPrefix( path ), &dir );
+			DbgPrintFmt( "DAWG8" );
 			return 0;
 		}
 		/*next_dir = strtok_r( NULL, "/", &tokstate );*/
 		next_dir = strtok_r( NULL, "\\", &tokstate );
+		DbgPrintFmt( "DAWG9" );
 	}
 	FatFreeDirectory( FatResolveByPrefix( path ), &dir );
+	DbgPrintFmt( "DAWG10" );
 	free( cutpath );
 	return 1;
 }
@@ -89,7 +100,7 @@ fopen(
 		free( entry.name );
 		return NULL;
 	}
-	//    prINTf("Got entry: %s [%d]\n", entry.name, entry.first_cluster);
+	    DbgPrintFmt("Got entry: %s [%d]\n", entry.name, entry.first_cluster);
 	free( entry.name );
 
 	FAT32* filesystem = FatResolveByPrefix( pathname );

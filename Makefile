@@ -1,4 +1,5 @@
 ISO_IMAGE = disk.iso
+INITRD := vfs.tar.gz
 
 .PHONY: all
 all: $(ISO_IMAGE)
@@ -19,6 +20,7 @@ ntoskrnl:
 	$(MAKE) -C ntoskrnl
 
 $(ISO_IMAGE): ntldr ntoskrnl
+	tar czf $(INITRD) -C vfs/ ./ --format=ustar
 	rm -rf iso_root
 	mkdir -p iso_root
 	cp ntoskrnl/ntoskrnl.elf \

@@ -225,9 +225,12 @@ static struct liballoc_major *allocate_new_page( unsigned int size )
 
 	return maj;
 }
+#include "../ke/ki.h"
 
 void *liballoc_malloc( size_t req_size )
 {
+	DbgPrintFmt( "Requested size: %d", req_size );
+
 	int startedBet = 0;
 	unsigned long long bestSize = 0;
 	void *p = NULL;

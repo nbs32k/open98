@@ -32,7 +32,7 @@ KiKernelThread(
 
 )
 {
-
+	DbgPrintFmt( "yeld" );
 
 	
 	for ( ;;)
@@ -41,7 +41,7 @@ KiKernelThread(
 		it will crash the whole os if terminated*/
 	}
 }
-
+#include "drv/ustar/ustar.h"
 
 VOID
 KiSystemStartup(
@@ -66,6 +66,9 @@ KiSystemStartup(
 	HalInitACPI( ( PVOID )KiGetStivale2Tag( KBOOT_STRUCT, STIVALE2_STRUCT_TAG_RSDP_ID ) );
 	KiPrintToScreen( "[ OK ] Initialized ACPI" );
 
+
+
+
 	MmInitializePmm( KiGetStivale2Tag( KBOOT_STRUCT, STIVALE2_STRUCT_TAG_MEMMAP_ID ) );
 	KiPrintToScreen( "[ OK ] Initialized Physical Memory Manager" );
 
@@ -77,13 +80,14 @@ KiSystemStartup(
 	HalPCIInit( );
 	KiPrintToScreen( "[ OK ] Initialized PCI" );
 
-	
+
 
 	//Initialize Processes
 	/*PsThreadsInit( );
 	KiPrintToScreen( "[ OK ] Initialized Processes and Threads" );*/
 
 	//Initialize drivers
+
 	KiInitKeyboard( );
 	KiPrintToScreen( "[ OK ] Initialized Keyboard Driver" );
 
@@ -93,6 +97,19 @@ KiSystemStartup(
 
 	KiATAIdentify( );
 	KiPrintToScreen( "[ OK ] Initialized ATA Driver" );
+
+	struct stivale2_struct_tag_modules *mod_tag = KiGetStivale2Tag( KBOOT_STRUCT, STIVALE2_STRUCT_TAG_MODULES_ID );
+	//ramfs
+	/*for ( int i = 0; i < mod_tag->module_count; i++ )
+	{
+		DbgPrintFmt( "%s", mod_tag->modules[ i ].string );
+		if ( !strcmp( mod_tag->modules[ i ].string, "$boot:///SYSTEM/VFS.TAR.GZ" ) )
+		{ 
+			vmm_map_page( &MiKernelPage, mod_tag->modules[ i ].begin, mod_tag->modules[ i ].begin, 0b11 );
+			KdInitRAMFS( mod_tag->modules[ i ].begin );
+			break;
+		}
+	}	ustar_list( );*/
 
 	BOOLEAN failBoot = TRUE;
 	for ( int i = 0; i < MAX_PARTITION; i++ )
@@ -130,15 +147,14 @@ KiSystemStartup(
 
 	free( pcBuffer );
 
+
 	/*PsThreadsInit( );
 	PspCreateThread( ( LPTHREAD_START_ROUTINE )KiKernelThread );*/
-
-	DbgPrintFmt( "%s", pcBuffer );
-
-	/*DwmInitialize( );
-	
-	NtCreateWindow( NULL, "SEX", NULL, 10, 10, 300, 100, NULL, NULL, NULL, NULL );*/
 	DwmInitialize( );
+
+	DwmCreateObject( "Disk Management", "", 10, 10, 500, 300, 0 );
+	DwmCreateObject( "Partition list", "Disk Management", 2, 0, 0, 0, 1 );
+
 	for ( ;;)
 	{
 		

@@ -3,11 +3,7 @@
     "",
     "\\ntoskrnl",
     "\\ntoskrnl\\drv",
-    "\\ntoskrnl\\fsrtl",
-    "\\ntoskrnl\\hal",
-    "\\ntoskrnl\\mod",
-    "\\ntoskrnl\\ntuser"
+    "\\ntoskrnl\\drv\\ustar"
   ],
-  "SelectedNode": "\\ntoskrnl\\mod\\draw.c",
   "PreviewInSolutionExplorer": false
 }

@@ -18,5 +18,7 @@ PspCreateThread(
 
 	Task->regs.rsp = ( UINT )malloc( STACK_SIZE ) + STACK_SIZE;
 
+	Task->page_map = vmm_create_new_pagemap( );
+
 	PsLoadTask( Task ); /* automatically enqueue the new Task */
 }

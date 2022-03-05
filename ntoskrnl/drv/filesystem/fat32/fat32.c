@@ -757,11 +757,12 @@ FatPopulateDir(
 	{
 		max_dirs += dirs_per_cluster;
 		dir->entries = krealloc( dir->entries, max_dirs * sizeof( struct DirectoryEntry ) );
+		DbgPrintFmt( "WTF1" );
 		// Double the size in case we need to read a Directory entry that
 		// spans the bounds of a cluster.
 		UCHAR root_cluster[ fs->ClusterSize * 2 ];
 		FatGetCluster( fs, root_cluster, cluster );
-
+		DbgPrintFmt( "WTF2" );
 		UCHAR *entry = root_cluster;
 		while ( ( UINT )( entry - root_cluster ) < fs->ClusterSize )
 		{
@@ -777,7 +778,10 @@ FatPopulateDir(
 			UINT secondcluster = 0;
 			UCHAR *nextentry = NULL;
 			struct DirectoryEntry *target_dirent = dir->entries + entry_count;
+			DbgPrintFmt( "%lx, %lx, %lx, %lx, %lx, %d, %d", fs, root_cluster, entry, nextentry, target_dirent
+			, cluster, secondcluster );
 			FatNextDirectoryEntry( fs, root_cluster, entry, &nextentry, target_dirent, cluster, &secondcluster );
+			DbgPrintFmt( "WTF3" );
 			entry = nextentry;
 			if ( secondcluster )
 			{
@@ -787,6 +791,7 @@ FatPopulateDir(
 			entry_count++;
 		}
 		cluster = FatGetNextClusterID( fs, cluster );
+		DbgPrintFmt( "WTF4" );
 		if ( cluster >= EOC ) break;
 	}
 	dir->num_entries = entry_count;

@@ -125,6 +125,7 @@ KiHandlePS2Mouse(
 	}
 }
 
+INT Window = -1;
 
 
 VOID
@@ -134,7 +135,6 @@ KiProcessMouse(
 {
 	if ( !bMousePacketReady )
 		return;
-	//if (isKeyboardUsed) return;
 
 
 	BOOLEAN xNegative, yNegative, xOverflow, yOverflow;
@@ -213,32 +213,29 @@ KiProcessMouse(
 	if ( KiMousePosition.Y > KiVBEData.Height - 1 )
 		KiMousePosition.Y = KiVBEData.Height - 1;
 
-
-
-
-	//ClearMouseCursor(MousePointer, pMousePositionOld);
-
-	//DrawOverlayMouseCursor(MousePointer, KiMousePosition, 0xffffff);
+	
 
 	if ( KiMousePacket[ 0 ] & PS2Leftbutton )
 	{
-		//PutPix(KiMousePosition.X, KiMousePosition.Y, 0x0000ff00);
-		//GlobalRenderer->PutChar('a', KiMousePosition.X, KiMousePosition.Y);
 		KiMouseState = MOUSE_LEFT_CLICK;
-
-		//curr_button_state[ 0 ] = 1;
 		
-		//dragging
-		//DbgPrintFmt("%d", DwmGetWindowUnderCursor( ) );
-
-		//DraggedWindowID = DwmGetWindowUnderCursor( );
-			//DwmSetObjectPosition( WinID, lolX, lolY );
+		/*if ( Window != -1 )
+		{
+			DwmModifyObjectPos( Window, KiMousePosition.X - 30, KiMousePosition.Y - 7 );
+		}
+		else
+			Window = DwmAcquireObjectUnderMouse( );*/
 		
+		INT winID = DwmAcquireCursorWindow( );
+
+		DwmSetWindowPos( winID, KiMousePosition.X - 30, KiMousePosition.Y - 7 );
+		DbgPrintFmt( "Debug window: %d", winID );
 	}
 	else
 	{
 		
-		//curr_button_state[ 0 ] = 0;
+		KiMouseState = 0;
+		Window = -1;
 	}
 	if ( KiMousePacket[ 0 ] & PS2Middlebutton )
 	{
@@ -248,11 +245,11 @@ KiProcessMouse(
 	{
 		KiMouseState = MOUSE_RIGHT_CLICK;
 
-		curr_button_state[ 2 ] = 1;
+		KiMouseState = 0;
 	}
 	else
 	{
-		curr_button_state[ 2 ] = 0;
+		KiMouseState = 0;
 	}
 
 
@@ -268,7 +265,8 @@ KiProcessMouse(
 
 	bMousePacketReady = FALSE;
 	pMousePositionOld = KiMousePosition;
-
+	
+	bRefreshBuffer = TRUE; //leet
 }
 
 

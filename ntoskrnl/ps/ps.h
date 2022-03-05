@@ -9,7 +9,7 @@ typedef struct TASK_STRUCT
 	int status;
 
 	struct InterruptRegisters regs;
-	ULONG64* page_map;
+	pagemap_t* page_map;
 	UCHAR flags;
 } KSYSTEM_TASK;
 

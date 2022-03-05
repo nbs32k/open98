@@ -52,3 +52,6 @@ void *krealloc( void *ptr, size_t size );
 void *kcalloc( size_t size );
 int kheap_init( );
 
+
+
+void *liballoc_alloc( int size );

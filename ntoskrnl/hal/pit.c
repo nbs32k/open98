@@ -32,11 +32,14 @@ KiUpdateTick(
 	struct InterruptRegisters *reg
 )
 {
-	PsScheduleThreads( reg );
-
-	DwmRefreshBuffer( );
-	
 	ulTick++;
+	PsScheduleThreads( reg );
+	
+	if ( !( ulTick % ( div / 30 ) ) )
+	{
+		DwmRefreshBuffer( );
+		
+	}
 }
 
 VOID
