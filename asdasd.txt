@@ -1,0 +1,283 @@
+#include "module.h"
+#include "../drv/drv.h"
+#include "../mm/mm.h"
+#include <lib/utill.h>
+
+#include "../ntuser/ntuser.h"
+
+/*
+
+	Desktop Window Manager
+
+*/
+
+
+#define MAX_WINDOWS 128
+#define BACKGROUND_COLOR 0x00008080
+#define TITLE_BAR_THICKNESS 22
+
+struct KSYSTEM_WINDOW
+{
+
+	CHAR* Title;
+	UINT* Framebuffer;
+	UINT  X;
+	UINT  Y;
+	UINT  Width;
+	UINT  Height;
+	UINT  WindowType;
+	/*0 - Form
+	  1 - Label
+	  2 - Button
+	*/
+	INT	  WindowID;
+
+
+};
+
+INT iLastWindow = 0;
+
+struct KSYSTEM_WINDOW* Windows; // Swaggers
+STATIC UINT*	DwmFramebuffer;
+STATIC INT		DwmScreenWidth;
+STATIC INT		DwmScreenHeight;
+INT				DwmScreenPitch;
+
+STATIC INT		DwmFramebufferSize;
+
+UINT*			DwmAntiBuffer;
+
+BOOLEAN			bRefreshBuffer = FALSE;
+
+static char *dwm_strcpy( char *dest, const char *src )
+{
+	INT i;
+
+	for ( i = 0; src[ i ]; i++ )
+		dest[ i ] = src[ i ];
+	dest[ i ] = 0;
+
+	return dest;
+}
+
+
+
+
+
+
+VOID
+DwmCreateObject(
+	CHAR* Title,
+	UINT X,
+	UINT Y,
+	UINT Width,
+	UINT Height,
+	UINT WindowType
+)
+{
+
+	if ( iLastWindow == MAX_WINDOWS ) return;
+
+	iLastWindow++;
+
+
+	CHAR* tempTitle = ( CHAR* )kcalloc( RtlStringLength( Title ) );
+	UINT* Framebuffer = kcalloc( ( Width - X ) * ( Height - Y ) * sizeof( UINT ) );
+
+	RtlSetMemory( Framebuffer, 0x000000, ( Width - X ) * ( Height - Y ) * sizeof( UINT ) );
+
+	dwm_strcpy( tempTitle, Title );
+
+	Windows[ iLastWindow ].Title = tempTitle;
+	Windows[ iLastWindow ].X = X;
+	Windows[ iLastWindow ].Y = Y;
+	Windows[ iLastWindow ].Width = Width;
+	Windows[ iLastWindow ].Height = Height;
+	Windows[ iLastWindow ].WindowType = WindowType;
+	Windows[ iLastWindow ].WindowID = iLastWindow;
+	Windows[ iLastWindow ].Framebuffer = Framebuffer;
+
+	DbgPrintFmt( "%lx %lx %lx %lx", tempTitle, Windows[ iLastWindow ].Framebuffer, DwmAntiBuffer, DwmFramebuffer);
+
+	DbgPrintFmt( "Created new window:\nTitle: %s\nX: %d\nY: %d\nWidth: %d\nHeight: %d\nWindowType: %d\nWindowID: %d",
+				 Windows[ iLastWindow ].Title, Windows[ iLastWindow ].X, Windows[ iLastWindow ].Y, Windows[ iLastWindow ].Width, Windows[ iLastWindow ].Height, Windows[ iLastWindow ].WindowType, Windows[ iLastWindow ].WindowID );
+
+	free( tempTitle );
+	bRefreshBuffer = TRUE;
+}
+
+struct KSYSTEM_WINDOW
+DwmAcquireInformation(
+	INT WindowID
+)
+{
+	for ( int i = 0; i < MAX_WINDOWS; ++i )
+	{
+		
+		if ( Windows[ i ].WindowID == WindowID )
+			return Windows[ i ];
+	}
+
+}
+
+
+VOID
+DwmPlotPixelOnWindowFramebuffer(
+	INT WindowID,
+	INT x,
+	INT y,
+	INT hex
+)
+{
+
+	struct KSYSTEM_WINDOW window = DwmAcquireInformation( WindowID );
+
+	if ( !window.WindowID )
+		return;
+
+	if ( x >= window.Width || y >= window.Height || x < 0 || y < 0 )
+		return;
+
+	INT iOffset = x + (window.Width) * y;
+
+	window.Framebuffer[ iOffset ] = hex;
+	bRefreshBuffer = TRUE;
+
+}
+
+static void plot_px( int x, int y, UINT hex )
+{
+	if ( x >= DwmScreenWidth || y >= DwmScreenHeight || x < 0 || y < 0 )
+		return;
+
+	INT iOffset = x + ( DwmScreenPitch / sizeof( UINT ) ) * y;
+
+	DwmAntiBuffer[ iOffset ] = hex;
+
+	return;
+}
+
+VOID
+DwmRefreshBuffer(
+
+)
+{
+	if ( !bRefreshBuffer ) return;
+
+	bRefreshBuffer = FALSE;
+
+	//Set background
+	for ( INT i = 0; i < DwmFramebufferSize; ++i )
+		DwmAntiBuffer[ i ] = BACKGROUND_COLOR;
+
+
+	//Draw Forms
+	for ( INT tempI = 0; tempI < MAX_WINDOWS; ++tempI )
+	{
+		//DbgPrintFmt( "lol" );
+
+		//If NULL, don't render!
+		struct KSYSTEM_WINDOW Window = DwmAcquireInformation( tempI );
+		if ( Window.WindowID != NULL )
+		{
+			//DbgPrintFmt( "sex" );
+			/*switch ( Window.WindowType )
+			{
+				case 0:
+
+					break;
+				case 1:
+
+					break;
+				case 2:
+
+					break;
+
+			}*/
+
+			//render test
+			/*for ( INT i = Window.X; i < Window.Width; ++i )
+			{
+				for ( INT j = Window.Y; j < Window.Height; ++j )
+				{
+					INT iOffset = i + ( DwmScreenPitch / sizeof( UINT ) ) * j;
+
+					DwmAntiBuffer[ iOffset ] = 0xffffff;
+				}
+			}
+*/
+			INT iStartX = Window.X;
+			INT iEndX = Window.Width;
+			INT iStartY = Window.Y;
+			INT iEndY = Window.Height;
+
+			DwmDrawFilled( iStartX, iEndX, iStartY, iEndY, 0x000000 );
+			DwmDrawFilled( iStartX, iEndX - 1, iStartY, iEndY - 1, 0xDFDFDF );
+
+			DwmDrawFilled( iStartX + 1, iEndX - 1, iStartY + 1, iEndY - 1, 0x808080 );
+			DwmDrawFilled( iStartX + 1, iEndX - 2, iStartY + 1, iEndY - 2, 0xFFFFFF );
+
+			DwmDrawFilled( iStartX + 2, iEndX - 2, iStartY + 2, iEndY - 2, 0xC0C0C0 );
+
+
+			DwmDrawFilled( iStartX + 3, iEndX - 3, iStartY + 3, iStartY + TITLE_BAR_THICKNESS - 1, 0x000080 );
+
+			INT in_x = 1;
+			INT in_y = TITLE_BAR_THICKNESS;
+			for ( INT i = 0; i < ( Window.Width - Window.X ) * ( Window.Height - Window.Y ) * sizeof(UINT); i++ )
+			{
+				in_x++;
+				//DbgPrintFmt( "%lx %lx %lx", DwmFramebuffer, Windows[ iLastWindow ].Framebuffer, DwmAntiBuffer );
+				plot_px( in_x + Window.X, in_y + Window.Y, Window.Framebuffer[ i ] );
+				if ( in_x - 1 == Window.Width - Window.X - 4 )
+				{
+					in_y++;
+					in_x = 1;
+				}
+
+				if ( in_y == Window.Height - Window.Y - 3 )
+					break;
+			}
+
+
+
+
+		}
+
+	}
+
+
+	//Apply changes
+	for ( INT i = 0; i < DwmFramebufferSize / sizeof( UINT ); ++i )
+		DwmFramebuffer[ i ] = DwmAntiBuffer[ i ];
+}
+
+BOOLEAN
+DwmInitialize(
+
+)
+{
+	DwmFramebuffer = ( UINT* )KiVBEData.Address; //cast
+	DwmScreenWidth = KiVBEData.Width;
+	DwmScreenHeight = KiVBEData.Height;
+	DwmScreenPitch = KiVBEData.Pitch;
+
+	Windows = ( struct KSYSTEM_WINDOW* )malloc( sizeof( struct KSYSTEM_WINDOW ) * MAX_WINDOWS );
+
+	DwmFramebufferSize = DwmScreenPitch * DwmScreenHeight;
+
+	DwmAntiBuffer = ( UINT* )kcalloc( DwmFramebufferSize );
+
+	if ( !DwmAntiBuffer )
+		return FALSE;
+
+
+	bRefreshBuffer = TRUE;
+
+	DwmCreateObject( "xd", 10, 10, 500, 300, 0 );
+
+	
+
+	//DwmPlotPixelOnWindowFramebuffer( 1, 10, 10, 0x000000);
+	//DwmCreateObject( "tst", 280, 10, 300, 200, 0 );
+}
