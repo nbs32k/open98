@@ -21,6 +21,26 @@ An NT-Styled Kernel Clone | x86_64 architecture. It is able to read & write ATA 
 - Panic Screen
 - Basic GUI
 
+Example of how to read files: 
+```
+        PCHAR pcBuffer;
+	ULONG dwBytes;
+	PHANDLE hFile;
+	BOOLEAN bSuccess;
+
+	pcBuffer = ( PCHAR )malloc( 512 );
+
+	hFile = NtCreateFile( "C:\\SYSTEM\\POG.TXT", GENERIC_ALL, 0, 0, OPEN_EXISTING, 0, 0 );
+	bSuccess = NtReadFile( hFile, pcBuffer, 512, &dwBytes, NULL );
+
+	NtClose( hFile );
+
+	if(bSuccess)
+		DbgPrintFmt( "File has been read successfully!" );
+
+	free( pcBuffer );
+```
+
 ![qemu-system-x86_64_ZvbQLWIKe1](https://user-images.githubusercontent.com/68382500/156880300-ca718f2f-33f9-4493-8f93-91b8ff5ab487.png)
 ![qemu-system-x86_64_0kYM6K1KMf](https://user-images.githubusercontent.com/68382500/156881165-d2cdcf8d-f91b-4336-a475-8dcc1ed2b1b5.png)
 
